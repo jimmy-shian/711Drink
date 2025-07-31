@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>711 飲料紀杯平台 - 管理員介面</title>
+  <!-- Bootstrap 5 CDN -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { padding-top: 40px; }
+    .hide { display:none; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <!-- 提示訊息 -->
+  <div id="msg" class="alert hide" role="alert"></div>
+
+  <!-- 登入 / 註冊 卡片 -->
+  <div id="authCard" class="card mx-auto" style="max-width:400px;">
+    <div class="card-body">
+      <h5 class="card-title text-center mb-3" id="authTitle">管理員登入</h5>
+
+      <div class="mb-3">
+        <label for="username" class="form-label">帳號</label>
+        <input type="text" class="form-control" id="username" required>
+      </div>
+      <div class="mb-3">
+        <label for="password" class="form-label">密碼</label>
+        <input type="password" class="form-control" id="password" required>
+      </div>
+      <!-- 驗證碼 (註冊時) -->
+      <div class="mb-3 hide" id="vcodeGroup">
+        <label for="verifyCode" class="form-label">驗證碼</label>
+        <input type="text" class="form-control" id="verifyCode">
+      </div>
+
+      <button id="loginBtn" class="btn btn-primary w-100" onclick="login()">登入</button>
+      <button id="registerBtn" class="btn btn-success w-100 hide" onclick="register()">註冊</button>
+
+      <div class="text-center mt-3">
+        <a href="#" id="toggleAuth" onclick="toggleMode(event)">尚未註冊？點此註冊</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主要面板 -->
+  <div id="mainPanel" class="hide">
+    <h3 class="mb-4">管理控制台</h3>
+    <ul class="nav nav-tabs" id="tabMenu" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="cust-tab" data-bs-toggle="tab" data-bs-target="#cust" type="button" role="tab">顧客管理</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="drink-tab" data-bs-toggle="tab" data-bs-target="#drink" type="button" role="tab">飲料異動</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="link-tab" data-bs-toggle="tab" data-bs-target="#link" type="button" role="tab">臨時連結</button>
+      </li>
+    </ul>
+    <div class="tab-content p-3 border border-top-0" id="tabContent">
+      <!-- 顧客管理 -->
+      <div class="tab-pane fade show active" id="cust" role="tabpanel">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label">顧客代號 (手機)</label>
+            <input type="text" class="form-control" id="newCustId">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">顧客姓名</label>
+            <input type="text" class="form-control" id="newCustName">
+          </div>
+          <div class="col-md-4">
+            <button class="btn btn-primary w-100" onclick="createCustomer()">建立顧客</button>
+          </div>
+        </div>
+      </div>
+      <!-- 飲料異動 -->
+      <div class="tab-pane fade" id="drink" role="tabpanel">
+        <div class="row g-3 align-items-end mb-3">
+          <div class="col-md-4">
+            <label class="form-label">顧客代號</label>
+            <input type="text" class="form-control" id="dCustId">
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-secondary w-100 mt-4" onclick="loadCustomer()">查詢</button>
+          </div>
+          <div class="col-md-2 ms-auto text-end">
+            <button class="btn btn-outline-primary mt-4" id="shareBtn" style="display:none" onclick="genLink()">產生連結(QR)</button>
+          </div>
+        </div>
+        <div id="drinkInfo" class="mb-4"></div>
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label">飲料名稱</label>
+            <input type="text" class="form-control" id="drinkName">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">數量</label>
+            <input type="number" class="form-control" id="drinkAmt" value="1" min="1">
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-success w-100" onclick="changeDrink(1)">增加</button>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-danger w-100" onclick="changeDrink(-1)">減少</button>
+          </div>
+        </div>
+        <!-- QR code -->
+        <div class="text-center mt-3"><img id="qrImg" style="max-width:180px;display:none"></div>
+      </div>
+        <div class="row g-3 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">顧客代號</label>
+            <input type="text" class="form-control" id="dCustId">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">飲料名稱</label>
+            <input type="text" class="form-control" id="drinkName">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">數量</label>
+            <input type="number" class="form-control" id="drinkAmt" value="1" min="1">
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-success w-100" onclick="changeDrink(1)">增加</button>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-danger w-100" onclick="changeDrink(-1)">減少</button>
+          </div>
+        </div>
+      </div>
+      <!-- 臨時連結 -->
+      <div class="tab-pane fade" id="link" role="tabpanel">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-6">
+            <label class="form-label">顧客代號</label>
+            <input type="text" class="form-control" id="linkCustId">
+          </div>
+          <div class="col-md-6">
+            <button class="btn btn-primary w-100" onclick="genLink()">產生臨時連結</button>
+          </div>
+        </div>
+        <div class="mt-3">
+          <input type="text" id="linkOutput" class="form-control" readonly placeholder="產生的連結將顯示於此">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function loadCustomer(){
+  const customerId=document.getElementById('dCustId').value.trim();
+  if(!customerId)return;
+  google.script.run.withSuccessHandler(res=>{
+    if(!res.success){ showMsg(res.msg,'danger');return; }
+    renderDrinkInfo(res.data);
+    document.getElementById('shareBtn').style.display='inline-block';
+  }).handleGetCustomerData({customerId});
+}
+function renderDrinkInfo(data){
+  const div=document.getElementById('drinkInfo');
+  if(data.length<=1){div.innerHTML='<p>尚無資料</p>';return;}
+  const drinkMap={};
+  const history=[];
+  for(let i=1;i<data.length;i++){
+    const [name,remain,time,op,act,amt]=data[i];
+    if(!(name in drinkMap)) drinkMap[name]=remain;
+    history.push({name,remain,time,op,act,amt});
+  }
+  let html='<div class="row g-3">';
+  Object.entries(drinkMap).forEach(([n,r])=>{
+    html+=`<div class="col-md-3"><div class="card"><div class="card-body text-center"><h5>${n}</h5><p class="fs-4">${r}</p></div></div></div>`;
+  });
+  html+='</div><hr><h6>歷史異動</h6>';
+  history.sort((a,b)=>new Date(b.time)-new Date(a.time));
+  history.forEach(h=>{
+    const cls=h.act==='增加'?'border-start border-4 border-success':'border-start border-4 border-danger';
+    html+=`<div class="card mb-2 ${cls}"><div class="card-body p-2"><div class="d-flex justify-content-between"><span>${h.time}</span><span>${h.op}</span></div><div>${h.act} ${h.name} ${h.amt} 杯，剩餘 ${h.remain}</div></div></div>`;
+  });
+  div.innerHTML=html;
+}
+</script>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let isRegisterMode = false;
+function toggleMode(e){
+  e.preventDefault();
+  isRegisterMode = !isRegisterMode;
+  document.getElementById('vcodeGroup').classList.toggle('hide', !isRegisterMode);
+  document.getElementById('registerBtn').classList.toggle('hide', !isRegisterMode);
+  document.getElementById('loginBtn').classList.toggle('hide', isRegisterMode);
+  document.getElementById('authTitle').innerText = isRegisterMode ? '管理員註冊' : '管理員登入';
+  document.getElementById('toggleAuth').innerText = isRegisterMode ? '已有帳號？點此登入' : '尚未註冊？點此註冊';
+}
+function showMsg(txt,type='success'){
+  const el=document.getElementById('msg');
+  el.className='alert alert-'+type;
+  el.innerText=txt;
+  el.classList.remove('hide');
+  setTimeout(()=>el.classList.add('hide'),3000);
+}
+function login(){
+  const username=document.getElementById('username').value.trim();
+  const password=document.getElementById('password').value.trim();
+  google.script.run.withSuccessHandler(res=>{
+    if(res.success){
+      document.getElementById('authCard').classList.add('hide');
+      document.getElementById('mainPanel').classList.remove('hide');
+      showMsg('登入成功');
+    }else{ showMsg(res.msg,'danger'); }
+  }).handleLogin({username,password});
+}
+function register(){
+  const username=document.getElementById('username').value.trim();
+  const password=document.getElementById('password').value.trim();
+  const verifyCode=document.getElementById('verifyCode').value.trim();
+  google.script.run.withSuccessHandler(res=>{
+    if(res.success){
+      showMsg('註冊成功，請重新登入');
+      toggleMode(new Event('click')); // 切回登入
+    }else{ showMsg(res.msg,'danger'); }
+  }).handleRegister({username,password,verifyCode});
+}
+function createCustomer(){
+  const customerId=document.getElementById('newCustId').value.trim();
+  const customerName=document.getElementById('newCustName').value.trim();
+  google.script.run.withSuccessHandler(res=>{
+    showMsg(res.msg,res.success?'success':'danger');
+  }).handleCreateCustomer({customerId,customerName});
+}
+function changeDrink(sign){
+  const customerId=document.getElementById('dCustId').value.trim();
+  const drinkName=document.getElementById('drinkName').value.trim();
+  const amount=document.getElementById('drinkAmt').value;
+  const operator=document.getElementById('username').value; // 登入者
+  const api = sign>0 ? 'addDrinkAPI' : 'reduceDrinkAPI';
+  google.script.run.withSuccessHandler(res=>{
+    showMsg(res.msg,res.success?'success':'danger');
+  }).withFailureHandler(err=>showMsg(err.message,'danger'))
+    .withFailureHandler(err=>showMsg(err.message,'danger'))[""+api]({customerId,drinkName,amount,operator});
+}
+function genLink(){
+  const customerId=document.getElementById('dCustId').value.trim();
+  google.script.run.withSuccessHandler(res=>{
+    if(res.success){
+      document.getElementById('qrImg').src=`https://chart.googleapis.com/chart?cht=qr&chs=180x180&chl=${encodeURIComponent(res.url)}`;
+      document.getElementById('qrImg').style.display='block';
+      showMsg('連結已產生');
+    }else{ showMsg(res.msg,'danger'); }
+  }).handleGenerateTempLink({customerId});
+}
+</script>
+</body>
+</html>
