@@ -239,7 +239,7 @@ window.genLink = function(){
 </script>
 <script>
 // === GAS API wrapper for static hosting ===
-const GAS_URL='https://script.google.com/macros/s/AKfycbzV6SBEMbmrfI4CYpmA5fPRhCSYGT8O8Om6QMt4h5OWJLGN0yv9bet3f6bVvF3WyFY92w/exec';
+const GAS_URL='https://script.google.com/macros/s/AKfycbwuRremwQcRczhjfMFA5fia349GIEpR89OxVlv0p_MO43n9gyZN5pTzmu2JqNIPJxvrEw/exec';
 function api(action,data={}){
   return $.post(GAS_URL,{action, data: JSON.stringify(data)})
           .then(res=>typeof res==='string'?JSON.parse(res):res);
