@@ -76,8 +76,19 @@
 - `A1`: 驗證碼（註冊時需輸入此碼）
 
 ### 2. `Admins`
-| Username | Password |
-|----------|----------|
+| Username | Password | DisplayName |
+|----------|----------|-------------|
+
+### 2.1 更新管理員資料 API
+- action: `updateAdmin`
+- data:
+  | key | type | description |
+  |-----|------|-------------|
+  | username | string | 帳號 (必填) |
+  | oldPassword | string | 舊密碼 (必填) |
+  | newPassword | string | 新密碼 (可選) |
+  | newName | string | 新顯示名稱 (可選) |
+- 回傳: `{ success:boolean, msg:string }`
 
 ### 3. `Customers`
 | CustomerID | CustomerName | SheetName |

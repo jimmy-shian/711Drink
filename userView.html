@@ -18,6 +18,11 @@
   <hr>
   <h5>歷史異動</h5>
   <div id="history"></div>
+  <div class="accordion mt-3" id="monthAcc"></div>
+</div>
+<!-- Loading overlay -->
+<div id="loading" class="position-fixed top-0 start-0 w-100 h-100 justify-content-center align-items-center bg-white bg-opacity-75" style="z-index:1051; display:none">
+  <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -26,7 +31,7 @@
 // === Static view ===
 const urlParams = new URLSearchParams(location.search);
 const token = urlParams.get('token');
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbykT80EnIt22oGDz4iGOy3cKlDQWrOpv2fYelejjQkFEYsbWO8tJnxfzylPH7cQT6-4Ag/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwufMlRs9DzR_P_oAhQOAeC1ZxWSkYS6It2Ch2Sxy0UT1OZQruOiSUgQibykKJNGd8VLQ/exec';
 
 // API helper function using jQuery
 function api(action, data = {}) {
@@ -34,8 +39,37 @@ function api(action, data = {}) {
           .then(res => typeof res === 'string' ? JSON.parse(res) : res);
 }
 
+// countdown
+let countdownTimer;
+function startCountdown(exp){
+  clearInterval(countdownTimer);
+  const info=document.getElementById('info');
+  const update=()=>{
+    const ms=exp-Date.now();
+    if(ms<=0){
+      info.innerText='連結已過期';
+      clearInterval(countdownTimer);
+    }else{
+      const m=Math.floor(ms/60000);
+      const s=Math.floor((ms%60000)/1000).toString().padStart(2,'0');
+      info.innerText=`連結剩餘 ${m}:${s}`;
+    }
+  };
+  update();
+  countdownTimer=setInterval(update,1000);
+}
+
+// loading helper
+const setLoading = flag => {
+  const overlay=document.getElementById('loading');
+  if(flag){overlay.style.display='flex';}
+  else{overlay.style.display='none';}
+};
+
 // Render function
 async function render() {
+  setLoading(true);
+  try {
   let customerId = '';
   
   // Token validation
@@ -46,6 +80,9 @@ async function render() {
       return;
     }
     customerId = val.payload.customerId;
+      if(val.payload.exp){
+        startCountdown(val.payload.exp);
+      }
   } else {
     customerId = urlParams.get('customerId') || '';
   }
@@ -56,29 +93,19 @@ async function render() {
     return;
   }
 
-  // Fetch customer data
-  const res = await api('getCustomerData', { customerId });
-  if (!res.success) {
-    document.getElementById('info').innerText = res.msg;
-    return;
-  }
-
-  const data = res.data;
-
-  // If no data
-  if (data.length <= 1) {
+  // 初次抓取摘要 (餘量 + 最新5筆)
+  const res = await api('getCustomerSummary', { customerId, offset:0, limit:5 });
+  if(!res.success){ document.getElementById('info').innerText=res.msg;return; }
+  const remainArr=res.remain;
+  const historySlice=res.history;
+  const hasMore=res.hasMore;
+  if(remainArr.length===0){
     document.getElementById('info').innerText = '尚無資料';
     return;
   }
 
-  const drinkMap = {}, history = [];
-
-  // Process data
-  data.forEach(item => {
-    const [name, remain, time, op, act, amt] = item;
-    if (!(name in drinkMap)) drinkMap[name] = remain;
-    history.push({ name, remain, time, op, act, amt });
-  });
+  const drinkMap={};
+  remainArr.forEach(([n,r])=>{drinkMap[n]=r;});
 
   // Render drink list
   const listEl = document.getElementById('drinkList');
@@ -93,16 +120,52 @@ async function render() {
   // Render history
   const histEl = document.getElementById('history');
   histEl.innerHTML = '';
-  history.sort((a, b) => new Date(b.time) - new Date(a.time));
-  history.forEach(h => {
-    const cls = h.act === '增加' ? 'card-add' : 'card-reduce';
+  historySlice.forEach(h=>{
+    const cls = h[4] === '增加' ? 'card-add' : 'card-reduce';
     const card = document.createElement('div');
     card.className = `card mb-2 ${cls}`;
-    card.innerHTML = `<div class="card-body p-2"><div class="d-flex justify-content-between"><span>${h.time}</span><span>${h.op}</span></div><div>${h.act} ${h.name} ${h.amt} 杯，剩餘 ${h.remain}</div></div>`;
+    card.innerHTML = `<div class="card-body p-2"><div class="d-flex justify-content-between"><span>${h[2]}</span><span>${h[3]}</span></div><div>${h[4]} ${h[0]} ${h[5]} 杯，剩餘 ${h[1]}</div></div>`;
     histEl.appendChild(card);
   });
-}
+  // 查看更多
+  if(hasMore){
+    const btn=document.createElement('button');
+    btn.className='btn btn-outline-secondary btn-sm my-2';
+    btn.innerText='查看更多';
+    let offset=5;
+    btn.onclick=async()=>{
+      setLoading(true);
+      try{
+        const r=await api('getCustomerSummary',{customerId,offset,limit:5});
+        if(r.success){
+          r.history.forEach(h=>{historySlice.push(h);});
+          r.history.forEach(h=>{
+            const cls=h[4]==='增加'?'card-add':'card-reduce';
+            const card=document.createElement('div');
+            card.className=`card mb-2 ${cls}`;
+            card.innerHTML=`<div class=\"card-body p-2\"><div class=\"d-flex justify-content-between\"><span>${h[2]}</span><span>${h[3]}</span></div><div>${h[4]} ${h[0]} ${h[5]} 杯，剩餘 ${h[1]}</div></div>`;
+            document.getElementById('history').appendChild(card);
+          });
+          offset+=5;
+          if(!r.hasMore) btn.remove();
+        }
+      }catch(err){
+        document.getElementById('info').innerText=err.message||'發生錯誤';
+      }finally{
+        setLoading(false);
+      }
+    };
+    document.getElementById('history').appendChild(btn);
+  }
 
+  buildMonthAccordion(customerId);
+   }catch(err){
+    document.getElementById('info').innerText = err.message || '發生錯誤';
+  }finally{
+    setLoading(false);
+  }
+}
+// {{ ... }}
 render();
 </script>
 </body>

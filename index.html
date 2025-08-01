@@ -15,6 +15,12 @@
 <div class="container">
   <!-- 提示訊息 -->
   <div id="msg" class="alert hide" role="alert"></div>
+  <!-- 使用者列 -->
+  <div id="userBar" class="d-flex justify-content-end align-items-center mb-3 hide">
+    <span id="userLabel" role="button" class="badge bg-info text-dark rounded-5 p-3" 
+    style="cursor:pointer; box-shadow: 0px 2px 2px rgba(0,0,0,0.1); margin-right: 1rem;"data-bs-toggle="modal" data-bs-target="#editAdminModal" title="點擊修改個人資料"></span>
+    <button class="btn btn-sm btn-outline-secondary d-none" id="logoutBtn" onclick="logout()">登出</button>
+  </div>
 
   <!-- 登入 / 註冊 卡片 -->
   <div id="authCard" class="card mx-auto" style="max-width:400px;">
@@ -45,20 +51,20 @@
   </div>
 
   <!-- 主要面板 -->
-  <div id="mainPanel" class="hide">
+  <div id="mainPanel" class="hide" style="margin-bottom: 4rem;">
     <h3 class="mb-4">管理控制台</h3>
     <ul class="nav nav-tabs" id="tabMenu" role="tablist">
       <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="cust-tab" data-bs-toggle="tab" data-bs-target="#cust" type="button" role="tab">顧客管理</button>
+        <button class="nav-link active" id="drink-tab" data-bs-toggle="tab" data-bs-target="#drink" type="button" role="tab">飲料異動</button>
       </li>
       <li class="nav-item" role="presentation">
-        <button class="nav-link" id="drink-tab" data-bs-toggle="tab" data-bs-target="#drink" type="button" role="tab">飲料異動</button>
+        <button class="nav-link" id="cust-tab" data-bs-toggle="tab" data-bs-target="#cust" type="button" role="tab">顧客管理</button>
       </li>
       
     </ul>
     <div class="tab-content p-3 border border-top-0" id="tabContent">
       <!-- 顧客管理 -->
-      <div class="tab-pane fade show active" id="cust" role="tabpanel">
+      <div class="tab-pane fade" id="cust" role="tabpanel">
         <div class="row g-3 align-items-end">
           <div class="col-md-4">
             <label class="form-label">顧客代號 (手機)</label>
@@ -74,11 +80,11 @@
         </div>
       </div>
       <!-- 飲料異動 -->
-      <div class="tab-pane fade" id="drink" role="tabpanel">
+      <div class="tab-pane fade show active" id="drink" role="tabpanel">
         <div class="row g-3 align-items-end mb-3">
           <div class="col-md-4">
-            <label class="form-label">顧客代號</label>
-            <input type="text" class="form-control" id="dCustId">
+            <label class="form-label">顧客代號或姓名</label>
+            <input type="text" class="form-control" id="dCustId" placeholder="輸入顧客代號或姓名">
           </div>
           <div class="col-md-2">
             <button class="btn btn-secondary w-100 mt-4" onclick="loadCustomer()">查詢</button>
@@ -88,81 +94,165 @@
           </div>
         </div>
         <div id="drinkInfo" class="mb-4"></div>
-        <div class="row g-3 align-items-end">
-          <div class="col-md-4">
-            <label class="form-label">飲料名稱</label>
-            <input type="text" class="form-control" id="drinkName">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">數量</label>
-            <input type="number" class="form-control" id="drinkAmt" value="1" min="1">
-          </div>
-          <div class="col-md-2">
-            <button class="btn btn-success w-100" onclick="changeDrink(1)">增加</button>
-          </div>
-          <div class="col-md-2">
-            <button class="btn btn-danger w-100" onclick="changeDrink(-1)">減少</button>
+        <hr><h6>歷史異動</h6>
+        <div id="historyList"></div>
+        <div class="text-center my-2"><button id="moreBtn" class="btn btn-outline-secondary btn-sm" style="display:none">查看更多</button></div>
+        <div class="p-3 border rounded bg-light mb-3">
+          <h6 class="mb-3">新增品項</h6>
+          <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+              <label class="form-label">飲料名稱</label>
+              <input type="text" class="form-control" id="drinkName" list="drinkSuggestions">
+              <div class="form-check mt-1"><input class="form-check-input" type="checkbox" id="cupChk"><label class="form-check-label" for="cupChk">隨行杯</label></div>
+              <datalist id="drinkSuggestions"></datalist>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">數量</label>
+              <input type="number" class="form-control" id="drinkAmt" value="1" min="1">
+            </div>
+            <div class="col-md-2">
+              <button class="btn btn-primary w-100 mt-4" onclick="createDrink()">新增品項</button>
+            </div>
           </div>
         </div>
-        <div class="mt-3">
-            <input type="text" id="linkOutput" class="form-control" readonly placeholder="產生的連結將顯示於此">
+        <div class="mt-3" id="linkGroup">
+            <input type="text" id="linkOutput" class="form-control hide" readonly placeholder="產生的連結將顯示於此" style="cursor:pointer" title="點擊複製">
+          </div>
+          <!-- Toast Element -->
+          <div id="copyToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="1500">
+            <div class="toast-body">
+              已複製連結！
+            </div>
           </div>
         <!-- QR code -->
-        <div class="text-center mt-3"><img id="qrImg" style="max-width:180px;display:none"></div>
-      </div>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">數量</label>
-            <input type="number" class="form-control" id="drinkAmt" value="1" min="1">
-          </div>
-          <div class="col-md-2">
-            <button class="btn btn-success w-100" onclick="changeDrink(1)">增加</button>
-        </div>
-        <div class="row g-3 align-items-end">
-          <div class="col-md-6">
-            <label class="form-label">產生連結</label>
-            <input type="text" id="linkOutput" class="form-control" readonly>
-          </div>
-          <div class="col-md-6 text-center">
-            <img id="qrImg" style="max-width:180px;display:none">
-          </div>
-        </div>
+        <div class="text-center mt-3 d-flex justify-content-center"><img id="qrImg" class="d-none" style="max-width:180px; cursor:pointer" alt="QR Code" title="點擊複製連結"></div>
       </div>
     </div>
   </div>
 </div>
+
+<!-- 修改個人資料 Modal -->
+<div class="modal fade" id="editAdminModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">修改個人資料</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">顯示名稱</label>
+          <input type="text" class="form-control" id="editDisplayName">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">新密碼</label>
+          <input type="password" class="form-control" id="editNewPwd">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">舊密碼（驗證）</label>
+          <input type="password" class="form-control" id="editOldPwd">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" onclick="updateMe()">儲存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Loading overlay -->
+<div id="loading" class="position-fixed top-0 start-0 w-100 h-100 justify-content-center align-items-center bg-white bg-opacity-75" style="z-index:1060; display:none">
+  <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+</div>
+
+
 <script>
-window.loadCustomer = function(){
-  const customerId=document.getElementById('dCustId').value.trim();
-  if(!customerId)return;
-  google.script.run.withSuccessHandler(res=>{
-    if(!res.success){ showMsg(res.msg,'danger');return; }
-    renderDrinkInfo(res.data);
-    document.getElementById('shareBtn').style.display='inline-block';
-  }).handleGetCustomerData({customerId});
-}
-window.renderDrinkInfo = function(data){
+
+let historyOffset=0,historyHasMore=false, currentCustomer='';
+
+function renderRemain(remainArr){
   const div=document.getElementById('drinkInfo');
-  if(data.length<=1){div.innerHTML='<p>尚無資料</p>';return;}
-  const drinkMap={};
-  const history=[];
-  for(let i=1;i<data.length;i++){
-    const [name,remain,time,op,act,amt]=data[i];
-    if(!(name in drinkMap)) drinkMap[name]=remain;
-    history.push({name,remain,time,op,act,amt});
-  }
+  if(remainArr.length===0){div.innerHTML='<p>尚無資料</p>';return;}
   let html='<div class="row g-3">';
-  Object.entries(drinkMap).forEach(([n,r])=>{
-    html+=`<div class="col-md-3"><div class="card"><div class="card-body text-center"><h5>${n}</h5><p class="fs-4">${r}</p></div></div></div>`;
+  remainArr.forEach(([n,r])=>{
+    html+=`<div class="col-md-3"><div class="card"><div class="card-body text-center"><h5>${n}</h5><p class="fs-4 mb-2">${r}</p><div class="d-flex justify-content-center"><button class="btn btn-sm btn-danger" onclick="changeDrink(-1,'${n}')">減少(-1)</button><button class="btn btn-sm btn-success me-2" onclick="changeDrink(1,'${n}')">增加(+1)</button></div></div></div></div>`;
   });
-  html+='</div><hr><h6>歷史異動</h6>';
-  history.sort((a,b)=>new Date(b.time)-new Date(a.time));
-  history.forEach(h=>{
-    const cls=h.act==='增加'?'border-start border-4 border-success':'border-start border-4 border-danger';
-    html+=`<div class="card mb-2 ${cls}"><div class="card-body p-2"><div class="d-flex justify-content-between"><span>${h.time}</span><span>${h.op}</span></div><div>${h.act} ${h.name} ${h.amt} 杯，剩餘 ${h.remain}</div></div></div>`;
-  });
+  html+='</div>';
   div.innerHTML=html;
 }
+
+function appendHistory(list){
+  const hist=document.getElementById('historyList');
+  list.forEach(row=>{
+    const [name,remain,time,op,act,amt]=row;
+    const cls=act==='增加'?'border-start border-4 border-success':'border-start border-4 border-danger';
+    const card=document.createElement('div');
+    card.className=`card mb-2 ${cls}`;
+    card.innerHTML=`<div class="card-body p-2"><div class="d-flex justify-content-between"><span>${time}</span><span>${op}</span></div><div>${act} ${name} ${amt} 杯，剩餘 ${remain}</div></div>`;
+    hist.appendChild(card);
+  });
+}
+
+async function fetchAndRenderSummary(offset,append){
+  const res=await api('getCustomerSummary',{customerId:currentCustomer,offset,limit:5});
+  if(!res.success){showMsg(res.msg,'danger');return;}
+  if(!append){
+    renderRemain(res.remain);
+    document.getElementById('historyList').innerHTML='';
+  }
+  appendHistory(res.history);
+  historyHasMore=res.hasMore;
+  document.getElementById('moreBtn').style.display= historyHasMore?'inline-block':'none';
+}
+
+document.getElementById('moreBtn').addEventListener('click',async()=>{
+  setLoading(true);
+  try{
+    historyOffset+=5;
+    await fetchAndRenderSummary(historyOffset,true);
+  }catch(err){
+    showMsg(err.message||'發生錯誤','danger');
+  }finally{
+    setLoading(false);
+  }
+});
+
+window.renderDrinkInfo = async function(customerId){
+  currentCustomer=customerId;
+  historyOffset=0;
+  await fetchAndRenderSummary(0,false);
+}
+
+
+window.buildSuggestions = function(data){
+  const dl=document.getElementById('drinkSuggestions');
+  if(!dl || !Array.isArray(data)) return;
+  const set=new Set();
+  for(let i=1;i<data.length;i++){
+    const name=data[i][0];
+    if(name) set.add(name);
+  }
+  dl.innerHTML=[...set].map(n=>`<option value="${n}"></option>`).join('');
+}
+
+// ------ input helpers ------
+function syncCupByName(){
+  const name=document.getElementById('drinkName').value.trim();
+  document.getElementById('cupChk').checked = name.endsWith('(隨行杯)');
+}
+function syncNameByCup(){
+  const input=document.getElementById('drinkName');
+  let name=input.value.trim();
+  const chk=document.getElementById('cupChk');
+  if(chk.checked){
+    if(!name.endsWith('(隨行杯)')){ input.value = name + '(隨行杯)'; }
+  }else{
+    if(name.endsWith('(隨行杯)')){ input.value = name.replace('(隨行杯)','').trim(); }
+  }
+}
+document.getElementById('drinkName').addEventListener('input',syncCupByName);
+document.getElementById('cupChk').addEventListener('change',syncNameByCup);
 </script>
 
 <!-- Bootstrap JS -->
@@ -186,116 +276,223 @@ window.showMsg = function(txt,type='success'){
   el.classList.remove('hide');
   setTimeout(()=>el.classList.add('hide'),3000);
 }
-window.login = function(){
-  const username=document.getElementById('username').value.trim();
-  const password=document.getElementById('password').value.trim();
-  google.script.run.withSuccessHandler(res=>{
-    if(res.success){
-      document.getElementById('authCard').classList.add('hide');
-      document.getElementById('mainPanel').classList.remove('hide');
-      showMsg('登入成功');
-    }else{ showMsg(res.msg,'danger'); }
-  }).handleLogin({username,password});
-}
-window.register = function(){
-  const username=document.getElementById('username').value.trim();
-  const password=document.getElementById('password').value.trim();
-  const verifyCode=document.getElementById('verifyCode').value.trim();
-  google.script.run.withSuccessHandler(res=>{
-    if(res.success){
-      showMsg('註冊成功，請重新登入');
-      toggleMode(new Event('click')); // 切回登入
-    }else{ showMsg(res.msg,'danger'); }
-  }).handleRegister({username,password,verifyCode});
-}
-window.createCustomer = function(){
-  const customerId=document.getElementById('newCustId').value.trim();
-  const customerName=document.getElementById('newCustName').value.trim();
-  google.script.run.withSuccessHandler(res=>{
-    showMsg(res.msg,res.success?'success':'danger');
-  }).handleCreateCustomer({customerId,customerName});
-}
-window.changeDrink = function(sign){
-  const customerId=document.getElementById('dCustId').value.trim();
-  const drinkName=document.getElementById('drinkName').value.trim();
-  const amount=document.getElementById('drinkAmt').value;
-  const operator=document.getElementById('username').value; // 登入者
-  const api = sign>0 ? 'addDrinkAPI' : 'reduceDrinkAPI';
-  google.script.run.withSuccessHandler(res=>{
-    showMsg(res.msg,res.success?'success':'danger');
-  }).withFailureHandler(err=>showMsg(err.message,'danger'))[""+api]({customerId,drinkName,amount,operator});
-}
-window.genLink = function(){
-  const customerId=document.getElementById('dCustId').value.trim();
-  google.script.run.withSuccessHandler(res=>{
-    if(res.success){
-      document.getElementById('linkOutput').value=res.url;
-      document.getElementById('qrImg').src=`https://chart.googleapis.com/chart?cht=qr&chs=180x180&chl=${encodeURIComponent(res.url)}`;
-      document.getElementById('qrImg').style.display='block';
-      showMsg('連結已產生');
-    }else{ showMsg(res.msg,'danger'); }
-  }).handleGenerateTempLink({customerId});
-}
+
+
+
+
+
 </script>
 <script>
 // === GAS API wrapper for static hosting ===
-const GAS_URL='https://script.google.com/macros/s/AKfycbwuRremwQcRczhjfMFA5fia349GIEpR89OxVlv0p_MO43n9gyZN5pTzmu2JqNIPJxvrEw/exec';
+const GAS_URL='https://script.google.com/macros/s/AKfycbwufMlRs9DzR_P_oAhQOAeC1ZxWSkYS6It2Ch2Sxy0UT1OZQruOiSUgQibykKJNGd8VLQ/exec';
 function api(action,data={}){
   return $.post(GAS_URL,{action, data: JSON.stringify(data)})
           .then(res=>typeof res==='string'?JSON.parse(res):res);
 }
 // override functions
 window.login = async function(){
-  const username=document.getElementById('username').value.trim();
-  const password=document.getElementById('password').value.trim();
-  const res=await api('login',{username,password});
-  if(res.success){
-    document.getElementById('authCard').classList.add('hide');
-    document.getElementById('mainPanel').classList.remove('hide');
-    showMsg('登入成功');
-  }else showMsg(res.msg,'danger');
+  setLoading(true);
+  try{
+    const username=document.getElementById('username').value.trim();
+    const password=document.getElementById('password').value.trim();
+    const res=await api('login',{username,password});
+    if(res.success){
+       document.getElementById('authCard').classList.add('hide');
+       document.getElementById('mainPanel').classList.remove('hide');
+       currentUsername=res.username;
+       currentDisplayName=res.displayName;
+       document.getElementById('userLabel').innerText=`Hi~歡迎 ${currentDisplayName}`;
+       document.getElementById('userBar').classList.remove('hide');
+       document.getElementById('logoutBtn').classList.remove('d-none');
+       showMsg('登入成功');
+     }else showMsg(res.msg,'danger');
+  }catch(err){
+    showMsg(err.message||'發生錯誤','danger');
+  }finally{
+    setLoading(false);
+  }
 }
 window.register = async function(){
-  const username=document.getElementById('username').value.trim();
-  const password=document.getElementById('password').value.trim();
-  const verifyCode=document.getElementById('verifyCode').value.trim();
-  const res=await api('register',{username,password,verifyCode});
-  if(res.success){showMsg('註冊成功，請重新登入');toggleMode(new Event('click'));}
-  else showMsg(res.msg,'danger');
+  setLoading(true);
+  try{
+    const username=document.getElementById('username').value.trim();
+    const password=document.getElementById('password').value.trim();
+    const verifyCode=document.getElementById('verifyCode').value.trim();
+    const res=await api('register',{username,password,verifyCode});
+    if(res.success){showMsg('註冊成功，請重新登入');toggleMode(new Event('click'));}
+    else showMsg(res.msg,'danger');
+  }catch(err){
+    showMsg(err.message||'發生錯誤','danger');
+  }finally{
+    setLoading(false);
+  }
 }
+// 登出
+window.logout = function(){
+  document.getElementById('mainPanel').classList.add('hide');
+  document.getElementById('userBar').classList.add('hide');
+  document.getElementById('authCard').classList.remove('hide');
+  document.getElementById('userLabel').innerText='';
+  document.getElementById('logoutBtn').classList.add('d-none');
+};
+
 window.createCustomer = async function(){
-  const customerId=document.getElementById('newCustId').value.trim();
-  const customerName=document.getElementById('newCustName').value.trim();
-  const res=await api('createCustomer',{customerId,customerName});
-  showMsg(res.msg,res.success?'success':'danger');
+  setLoading(true);
+  try{
+    const customerId=document.getElementById('newCustId').value.trim();
+    const customerName=document.getElementById('newCustName').value.trim();
+    const res=await api('createCustomer',{customerId,customerName});
+    showMsg(res.msg,res.success?'success':'danger');
+  }catch(err){
+    showMsg(err.message||'發生錯誤','danger');
+  }finally{
+    setLoading(false);
+  }
 }
+
+// 新增品項 (初始庫存)
+window.createDrink = async function(){
+  setLoading(true);
+  try{
+    const customerId=document.getElementById('dCustId').value.trim();
+    let drinkName=document.getElementById('drinkName').value.trim();
+  if(document.getElementById('cupChk').checked && !drinkName.endsWith('(隨行杯)')){
+    drinkName += '(隨行杯)';
+  }
+  const amount=parseInt(document.getElementById('drinkAmt').value,10)||1;
+  const operator=document.getElementById('username').value;
+  if(!customerId||!drinkName){showMsg('請輸入顧客與飲料','danger'); return;}
+    const res=await api('addDrink',{customerId,drinkName,amount,operator});
+    showMsg(res.msg,res.success?'success':'danger');
+    await loadCustomer();
+  }catch(err){
+    showMsg(err.message||'發生錯誤','danger');
+  }finally{
+    setLoading(false);
+  }
+}
+const setLoading=flag=>{
+  const overlay=document.getElementById('loading');
+  if(flag){overlay.style.display='flex';}
+  else{overlay.style.display='none';}
+};
+
 window.loadCustomer = async function(){
-  const customerId=document.getElementById('dCustId').value.trim();
-  if(!customerId) return;
-  const res=await api('getCustomerData',{customerId});
-  if(!res.success){showMsg(res.msg,'danger');return;}
-  renderDrinkInfo(res.data);
-  document.getElementById('shareBtn').style.display='inline-block';
+  setLoading(true);
+  try{
+    const customerId=document.getElementById('dCustId').value.trim();
+    if(!customerId){ return; }
+    const res=await api('getCustomerSummary',{customerId,offset:0,limit:5});
+    if(!res.success){ showMsg(res.msg,'danger'); return; }
+    renderDrinkInfo(customerId);
+    // suggestions build from remain + history
+    const names=new Set();
+    res.remain.forEach(([n])=>names.add(n));
+    res.history.forEach(row=>names.add(row[0]));
+    const dl=document.getElementById('drinkSuggestions');
+    dl.innerHTML=[...names].map(n=>`<option value="${n}"></option>`).join('');
+    document.getElementById('shareBtn').style.display='inline-block';
+  }catch(err){
+    showMsg(err.message||'發生錯誤','danger');
+  }finally{
+    setLoading(false);
+  }
 }
-window.changeDrink = async function(sign){
-  const customerId=document.getElementById('dCustId').value.trim();
-  const drinkName=document.getElementById('drinkName').value.trim();
-  const amount=document.getElementById('drinkAmt').value;
+window.changeDrink = async function(sign,drink){
+  setLoading(true);
+  try{
+    const customerId=document.getElementById('dCustId').value.trim();
+  let drinkName;
+    if(drink){
+      drinkName = drink; // 直接使用卡片名稱，不使用 checkbox
+    }else{
+      drinkName = document.getElementById('drinkName').value.trim();
+      const chk=document.getElementById('cupChk');
+      if(chk.checked && !drinkName.endsWith('(隨行杯)')){
+        drinkName += '(隨行杯)';
+      }else if(!chk.checked && drinkName.endsWith('(隨行杯)')){
+        drinkName = drinkName.replace('(隨行杯)','').trim();
+      }
+    }
+  if(!drinkName){showMsg('請輸入或選擇飲料名稱','danger');return;}
+  const amount=1;
   const operator=document.getElementById('username').value;
   const action= sign>0 ? 'addDrink' :'reduceDrink';
-  const res=await api(action,{customerId,drinkName,amount,operator});
-  showMsg(res.msg,res.success?'success':'danger');
+    const res=await api(action,{customerId,drinkName,amount,operator});
+    showMsg(res.msg,res.success?'success':'danger');
+    await loadCustomer();
+  }catch(err){
+    showMsg(err.message||'發生錯誤','danger');
+  }finally{
+    setLoading(false);
+  }
 }
 window.genLink = async function(){
-  const customerId=document.getElementById('dCustId').value.trim();
-  const res=await api('generateTempLink',{customerId});
-  if(res.success){
-    document.getElementById('linkOutput').value=res.url;
-    document.getElementById('qrImg').src=`https://chart.googleapis.com/chart?cht=qr&chs=180x180&chl=${encodeURIComponent(res.url)}`;
-    document.getElementById('qrImg').style.display='block';
-    showMsg('連結已產生');
-  }else showMsg(res.msg,'danger');
+  setLoading(true);
+  try{
+    const customerId=document.getElementById('dCustId').value.trim();
+    const res=await api('generateTempLink',{customerId});
+    if(res.success){
+      const token = res.token || (res.url ? new URL(res.url).searchParams.get('token') : '');
+      const basePath = location.pathname.endsWith('index.html') ? location.pathname.replace('index.html','userView.html') : '/userView.html';
+      const url = location.origin + basePath + `?token=${token}`;
+      document.getElementById('linkOutput').value=url;
+      document.getElementById('qrImg').src=`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`;
+      document.getElementById('qrImg').classList.remove('d-none');
+      showMsg('連結已產生');
+      document.getElementById('linkOutput').classList.remove('hide');
+    }else{
+      showMsg(res.msg,'danger');
+    }
+  }catch(err){
+    showMsg(err.message||'發生錯誤','danger');
+  }finally{
+    setLoading(false);
+  }
 }
+</script>
+
+<script>
+let currentUsername='';
+let currentDisplayName='';
+// QR 點擊複製
+// linkGroup 點擊時複製 linkOutput 的內容
+const linkGroupEl = document.getElementById('linkGroup');
+if (linkGroupEl) {
+  linkGroupEl.addEventListener('click', () => {
+    const val = document.getElementById('linkOutput').value.trim();  // 獲取 'linkOutput' 的值
+    if (val) {
+      navigator.clipboard.writeText(val).then(() => {
+        // 顯示已複製的提示
+        const toastEl = document.getElementById('copyToast');
+        const toast = new bootstrap.Toast(toastEl);  // 使用 Bootstrap 的 Toast API
+        toast.show();  // 顯示 Toast
+      });
+    }
+  });
+}
+
+// 填入現有名稱
+ document.getElementById('editAdminModal').addEventListener('show.bs.modal',()=>{
+   document.getElementById('editDisplayName').value=currentDisplayName;
+ });
+// 更新自己
+window.updateMe = async function(){
+  const newName=document.getElementById('editDisplayName').value.trim();
+  const newPwd=document.getElementById('editNewPwd').value.trim();
+  const oldPwd=document.getElementById('editOldPwd').value.trim();
+  if(!oldPwd){showMsg('需輸入舊密碼','danger');return;}
+  setLoading(true);
+  try{
+    const res=await api('updateAdmin',{username:currentUsername,oldPassword:oldPwd,newPassword:newPwd,newName:newName});
+    showMsg(res.msg,res.success?'success':'danger');
+    if(res.success){
+      if(newName){currentDisplayName=newName; document.getElementById('userLabel').innerText=`Hi~歡迎 ${currentDisplayName}`;}
+      bootstrap.Modal.getInstance(document.getElementById('editAdminModal')).hide();
+    }
+  }catch(e){showMsg(e.message||'發生錯誤','danger');}
+  finally{setLoading(false);}
+};
 </script>
 </body>
 </html>
