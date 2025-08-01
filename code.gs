@@ -395,11 +395,14 @@ function handleGetCustomerSummary(p){
   if(data.length<=1){
     return {success:true, remain:[], history:[], hasMore:false, customerName:customerId};
   }
-  // 最新餘量 map
-  const remainMap={};
-  for(let i=1;i<data.length;i++){
-    const [name,remain]=data[i];
-    remainMap[name]=remain;
+  // 最新餘量 map (只處理最新紀錄)
+  // 從最後一列往前走，若品項已處理過就跳過
+  const remainMap = {};
+  for (let i = 1; i < data.length; i++) {
+    const [name, remain] = data[i];
+    if (!(name in remainMap)) {
+      remainMap[name] = remain;
+    }
   }
   const remainArr=Object.entries(remainMap);
   // 歷史由新到舊

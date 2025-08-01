@@ -355,19 +355,22 @@ document.getElementById('cupChk').addEventListener('change',syncNameByCup);
 let isRegisterMode = false;
 // === 自動填入已儲存帳密 ===
 document.addEventListener('DOMContentLoaded', () => {
-  const saved = localStorage.getItem('adminCred');
-  if(saved){
-    try{
-      const WEEK_MS = 10*24*60*60*1000;
-      const {username,password,ts} = JSON.parse(saved);
-      if(!ts || Date.now()-ts > WEEK_MS){
-        localStorage.removeItem('adminCred');
-      }else{
-        if(username) document.getElementById('username').value = username;
-        if(password) document.getElementById('password').value = password;
-      }
-    }catch(e){ localStorage.removeItem('adminCred'); }
-  }
+  const savedSession = localStorage.getItem('sessionData');
+    if (savedSession) {
+        try {
+            const session = JSON.parse(savedSession);
+            const now = Date.now();
+            // 10 days expiry
+            if (session && session.username && session.displayName && (now - session.ts < 10 * 24 * 60 * 60 * 1000)) {
+                // 如果 session 有效，直接設定登入狀態，不需重新 api call
+                setLoggedInState(session.username, session.displayName);
+            } else {
+                localStorage.removeItem('sessionData');
+            }
+        } catch (e) {
+            localStorage.removeItem('sessionData');
+        }
+    }
 });
 window.toggleMode = function (e) {
   e.preventDefault();
@@ -434,12 +437,25 @@ window.showMsg = function(txt,type='success'){
 </script>
 <script>
 // === GAS API wrapper for static hosting ===
-const GAS_URL='https://script.google.com/macros/s/AKfycbzaTzDAsiMlVZ4vigTUq4Yxvrog9bFXYxuuW_WtqDGsiPK2GrrmsCKdhEJTZD52sjfw/exec';
+const GAS_URL='https://script.google.com/macros/s/AKfycbxWjf8LY8HmrR8m0DdYNrMBS9MtBBCkfZa5ct_poztOtSbdsFn5yQT9hTyKqysENDx7ZQ/exec';
 function api(action,data={}){
   return $.post(GAS_URL,{action, data: JSON.stringify(data)})
           .then(res=>typeof res==='string'?JSON.parse(res):res);
 }
 // override functions
+// 設定登入成功後的 UI 狀態
+function setLoggedInState(username, displayName) {
+    document.getElementById('authCard').classList.add('hide');
+    document.getElementById('mainPanel').classList.remove('hide');
+    currentUsername = username;
+    currentDisplayName = displayName;
+    document.getElementById('userLabel').innerText = `Hi~歡迎 ${displayName}`;
+    document.getElementById('userBar').classList.remove('hide');
+    document.getElementById('logoutBtn').classList.remove('d-none');
+    // 儲存 session 資訊
+    localStorage.setItem('sessionData', JSON.stringify({username, displayName, ts:Date.now()}));
+}
+
 window.login = async function(){
   setLoading(true);
   try{
@@ -448,14 +464,7 @@ window.login = async function(){
     if(!username||!password){showMsg('需輸入完整資料','danger');return;}
     const res=await api('login',{username,password});
     if(res.success){
-       document.getElementById('authCard').classList.add('hide');
-       document.getElementById('mainPanel').classList.remove('hide');
-       currentUsername=res.username;
-       currentDisplayName=res.displayName;
-       document.getElementById('userLabel').innerText=`Hi~歡迎 ${currentDisplayName}`;
-       document.getElementById('userBar').classList.remove('hide');
-       document.getElementById('logoutBtn').classList.remove('d-none');
-       localStorage.setItem('adminCred', JSON.stringify({username,password,ts:Date.now()}));
+       setLoggedInState(res.username, res.displayName);
        showMsg('登入成功');
      }else showMsg(res.msg,'danger');
   }catch(err){
@@ -492,6 +501,7 @@ window.logout = function(){
   document.getElementById('authCard').classList.remove('hide');
   document.getElementById('userLabel').innerText='';
   document.getElementById('logoutBtn').classList.add('d-none');
+  localStorage.removeItem('sessionData');
 };
 
 window.createCustomer = async function(){
@@ -624,21 +634,25 @@ window.changeDrink = async function(sign,drink){
   const amount=1;
   const operator=currentDisplayName;
   const action= sign>0 ? 'addDrink' :'reduceDrink';
-    // 同步向後端送出異動並同時拉最新摘要，縮短等待時間
-    const [res, summary] = await Promise.all([
-      api(action,{customerId,drinkName,amount,operator}),
-      api('getCustomerSummary',{customerId,offset:0,limit:5})
-    ]);
-    showMsg(res.msg,res.success?'success':'danger');
-    if(summary && summary.success){
-      // 直接更新畫面，省去再次呼叫 loadCustomer
-      renderRemain(summary.remain);
-      // 清空並附加最新歷史
-      document.getElementById('historyList').innerHTML = '';
-      appendHistory(summary.history);
-      updateHistoryCollapse();
-      historyHasMore = summary.hasMore;
-      document.getElementById('moreBtn').style.display = historyHasMore?'inline-block':'none';
+    // 發送異動請求
+    const res = await api(action, { customerId, drinkName, amount, operator });
+    showMsg(res.msg, res.success ? 'success' : 'danger');
+
+    // 如果操作成功，才繼續拉取最新摘要
+    if (res.success) {
+      const summary = await api('getCustomerSummary', { customerId, offset: 0, limit: 5 });
+      
+      if (summary && summary.success) {
+        // 更新畫面，顯示最新摘要
+        renderRemain(summary.remain); // 更新餘額
+        document.getElementById('historyList').innerHTML = ''; // 清空歷史紀錄
+        appendHistory(summary.history); // 添加最新歷史
+        updateHistoryCollapse();
+        historyHasMore = summary.hasMore;
+        document.getElementById('moreBtn').style.display = historyHasMore ? 'inline-block' : 'none';
+      } else {
+        showMsg('摘要更新失敗', 'danger');
+      }
     }
   }catch(err){
     showMsg(err.message||'發生錯誤','danger');
@@ -734,7 +748,17 @@ window.updateMe = async function(){
     const res=await api('updateAdmin',{username:currentUsername,oldPassword:oldPwd,newPassword:newPwd,newName:newName});
     showMsg(res.msg,res.success?'success':'danger');
     if(res.success){
-      if(newName){currentDisplayName=newName; document.getElementById('userLabel').innerText=`Hi~歡迎 ${currentDisplayName}`;}
+      if(newName){
+        currentDisplayName=newName; 
+        document.getElementById('userLabel').innerText=`Hi~歡迎 ${currentDisplayName}`;
+        // 更新 localStorage 中的 sessionData
+        const sessionData = JSON.parse(localStorage.getItem('sessionData') || '{}');
+        if(sessionData && sessionData.username === currentUsername) {
+          sessionData.displayName = newName;
+          sessionData.ts = Date.now();
+          localStorage.setItem('sessionData', JSON.stringify(sessionData));
+        }
+      }
       bootstrap.Modal.getInstance(document.getElementById('editAdminModal')).hide();
     }
   }catch(e){showMsg(e.message||'發生錯誤','danger');}
