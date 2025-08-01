@@ -22,39 +22,89 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-const customerId = "<?!= customerId ?>";
-function render(){
-  google.script.run.withSuccessHandler(res=>{
-    if(!res.success){ document.getElementById('info').innerText=res.msg; return; }
-    const data=res.data;
-    if(data.length<=1){ document.getElementById('info').innerText='尚無資料'; return; }
-    const drinkMap={};
-    const history=[];
-    for(let i=1;i<data.length;i++){
-      const [name,remain,time,op,act,amt]=data[i];
-      if(!(name in drinkMap)) drinkMap[name]=remain;
-      history.push({name,remain,time,op,act,amt});
-    }
-    // drinks
-    const listEl=document.getElementById('drinkList');
-    listEl.innerHTML='';
-    Object.entries(drinkMap).forEach(([name,remain])=>{
-      const col=document.createElement('div');col.className='col-md-3';
-      col.innerHTML=`<div class="card"><div class="card-body text-center"><h5>${name}</h5><p class="fs-4">${remain}</p></div></div>`;
-      listEl.appendChild(col);
-    });
-    // history
-    const histEl=document.getElementById('history');
-    histEl.innerHTML='';
-    history.sort((a,b)=>new Date(b.time)-new Date(a.time));
-    history.forEach(h=>{
-      const cls=h.act==='增加'?'card-add':'card-reduce';
-      const card=document.createElement('div');card.className='card mb-2 '+cls;
-      card.innerHTML=`<div class="card-body p-2"><div class="d-flex justify-content-between"><span>${h.time}</span><span>${h.op}</span></div><div>${h.act} ${h.name} ${h.amt} 杯，剩餘 ${h.remain}</div></div>`;
-      histEl.appendChild(card);
-    });
-  }).handleGetCustomerData({customerId});
+// === Static view ===
+const urlParams = new URLSearchParams(location.search);
+const token = urlParams.get('token');
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbykT80EnIt22oGDz4iGOy3cKlDQWrOpv2fYelejjQkFEYsbWO8tJnxfzylPH7cQT6-4Ag/exec';
+
+// API helper function
+async function api(action, data = {}) {
+  const res = await fetch(GAS_URL, { 
+    method: 'POST', 
+    body: new URLSearchParams({ action, data: JSON.stringify(data) }) 
+  });
+  return res.json();
 }
+
+// Render function
+async function render() {
+  let customerId = '';
+  
+  // Token validation
+  if (token) {
+    const val = await api('validateToken', { token });
+    if (!val.success) {
+      document.getElementById('info').innerText = '連結已失效';
+      return;
+    }
+    customerId = val.payload.customerId;
+  } else {
+    customerId = urlParams.get('customerId') || '';
+  }
+
+  // If customerId is missing
+  if (!customerId) {
+    document.getElementById('info').innerText = '缺少參數';
+    return;
+  }
+
+  // Fetch customer data
+  const res = await api('getCustomerData', { customerId });
+  if (!res.success) {
+    document.getElementById('info').innerText = res.msg;
+    return;
+  }
+
+  const data = res.data;
+
+  // If no data
+  if (data.length <= 1) {
+    document.getElementById('info').innerText = '尚無資料';
+    return;
+  }
+
+  const drinkMap = {}, history = [];
+
+  // Process data
+  data.forEach(item => {
+    const [name, remain, time, op, act, amt] = item;
+    if (!(name in drinkMap)) drinkMap[name] = remain;
+    history.push({ name, remain, time, op, act, amt });
+  });
+
+  // Render drink list
+  const listEl = document.getElementById('drinkList');
+  listEl.innerHTML = '';
+  Object.entries(drinkMap).forEach(([name, remain]) => {
+    const col = document.createElement('div');
+    col.className = 'col-md-3';
+    col.innerHTML = `<div class="card"><div class="card-body text-center"><h5>${name}</h5><p class="fs-4">${remain}</p></div></div>`;
+    listEl.appendChild(col);
+  });
+
+  // Render history
+  const histEl = document.getElementById('history');
+  histEl.innerHTML = '';
+  history.sort((a, b) => new Date(b.time) - new Date(a.time));
+  history.forEach(h => {
+    const cls = h.act === '增加' ? 'card-add' : 'card-reduce';
+    const card = document.createElement('div');
+    card.className = `card mb-2 ${cls}`;
+    card.innerHTML = `<div class="card-body p-2"><div class="d-flex justify-content-between"><span>${h.time}</span><span>${h.op}</span></div><div>${h.act} ${h.name} ${h.amt} 杯，剩餘 ${h.remain}</div></div>`;
+    histEl.appendChild(card);
+  });
+}
+
 render();
 </script>
 </body>

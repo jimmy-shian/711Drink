@@ -54,9 +54,7 @@
       <li class="nav-item" role="presentation">
         <button class="nav-link" id="drink-tab" data-bs-toggle="tab" data-bs-target="#drink" type="button" role="tab">飲料異動</button>
       </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="link-tab" data-bs-toggle="tab" data-bs-target="#link" type="button" role="tab">臨時連結</button>
-      </li>
+      
     </ul>
     <div class="tab-content p-3 border border-top-0" id="tabContent">
       <!-- 顧客管理 -->
@@ -106,17 +104,12 @@
             <button class="btn btn-danger w-100" onclick="changeDrink(-1)">減少</button>
           </div>
         </div>
+        <div class="mt-3">
+            <input type="text" id="linkOutput" class="form-control" readonly placeholder="產生的連結將顯示於此">
+          </div>
         <!-- QR code -->
         <div class="text-center mt-3"><img id="qrImg" style="max-width:180px;display:none"></div>
       </div>
-        <div class="row g-3 align-items-end">
-          <div class="col-md-3">
-            <label class="form-label">顧客代號</label>
-            <input type="text" class="form-control" id="dCustId">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">飲料名稱</label>
-            <input type="text" class="form-control" id="drinkName">
           </div>
           <div class="col-md-2">
             <label class="form-label">數量</label>
@@ -124,32 +117,22 @@
           </div>
           <div class="col-md-2">
             <button class="btn btn-success w-100" onclick="changeDrink(1)">增加</button>
-          </div>
-          <div class="col-md-2">
-            <button class="btn btn-danger w-100" onclick="changeDrink(-1)">減少</button>
-          </div>
         </div>
-      </div>
-      <!-- 臨時連結 -->
-      <div class="tab-pane fade" id="link" role="tabpanel">
         <div class="row g-3 align-items-end">
           <div class="col-md-6">
-            <label class="form-label">顧客代號</label>
-            <input type="text" class="form-control" id="linkCustId">
+            <label class="form-label">產生連結</label>
+            <input type="text" id="linkOutput" class="form-control" readonly>
           </div>
-          <div class="col-md-6">
-            <button class="btn btn-primary w-100" onclick="genLink()">產生臨時連結</button>
+          <div class="col-md-6 text-center">
+            <img id="qrImg" style="max-width:180px;display:none">
           </div>
-        </div>
-        <div class="mt-3">
-          <input type="text" id="linkOutput" class="form-control" readonly placeholder="產生的連結將顯示於此">
         </div>
       </div>
     </div>
   </div>
 </div>
 <script>
-function loadCustomer(){
+window.loadCustomer = function(){
   const customerId=document.getElementById('dCustId').value.trim();
   if(!customerId)return;
   google.script.run.withSuccessHandler(res=>{
@@ -158,7 +141,7 @@ function loadCustomer(){
     document.getElementById('shareBtn').style.display='inline-block';
   }).handleGetCustomerData({customerId});
 }
-function renderDrinkInfo(data){
+window.renderDrinkInfo = function(data){
   const div=document.getElementById('drinkInfo');
   if(data.length<=1){div.innerHTML='<p>尚無資料</p>';return;}
   const drinkMap={};
@@ -186,7 +169,7 @@ function renderDrinkInfo(data){
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 let isRegisterMode = false;
-function toggleMode(e){
+window.toggleMode = function(e){
   e.preventDefault();
   isRegisterMode = !isRegisterMode;
   document.getElementById('vcodeGroup').classList.toggle('hide', !isRegisterMode);
@@ -195,14 +178,14 @@ function toggleMode(e){
   document.getElementById('authTitle').innerText = isRegisterMode ? '管理員註冊' : '管理員登入';
   document.getElementById('toggleAuth').innerText = isRegisterMode ? '已有帳號？點此登入' : '尚未註冊？點此註冊';
 }
-function showMsg(txt,type='success'){
+window.showMsg = function(txt,type='success'){
   const el=document.getElementById('msg');
   el.className='alert alert-'+type;
   el.innerText=txt;
   el.classList.remove('hide');
   setTimeout(()=>el.classList.add('hide'),3000);
 }
-function login(){
+window.login = function(){
   const username=document.getElementById('username').value.trim();
   const password=document.getElementById('password').value.trim();
   google.script.run.withSuccessHandler(res=>{
@@ -213,7 +196,7 @@ function login(){
     }else{ showMsg(res.msg,'danger'); }
   }).handleLogin({username,password});
 }
-function register(){
+window.register = function(){
   const username=document.getElementById('username').value.trim();
   const password=document.getElementById('password').value.trim();
   const verifyCode=document.getElementById('verifyCode').value.trim();
@@ -224,14 +207,14 @@ function register(){
     }else{ showMsg(res.msg,'danger'); }
   }).handleRegister({username,password,verifyCode});
 }
-function createCustomer(){
+window.createCustomer = function(){
   const customerId=document.getElementById('newCustId').value.trim();
   const customerName=document.getElementById('newCustName').value.trim();
   google.script.run.withSuccessHandler(res=>{
     showMsg(res.msg,res.success?'success':'danger');
   }).handleCreateCustomer({customerId,customerName});
 }
-function changeDrink(sign){
+window.changeDrink = function(sign){
   const customerId=document.getElementById('dCustId').value.trim();
   const drinkName=document.getElementById('drinkName').value.trim();
   const amount=document.getElementById('drinkAmt').value;
@@ -239,18 +222,78 @@ function changeDrink(sign){
   const api = sign>0 ? 'addDrinkAPI' : 'reduceDrinkAPI';
   google.script.run.withSuccessHandler(res=>{
     showMsg(res.msg,res.success?'success':'danger');
-  }).withFailureHandler(err=>showMsg(err.message,'danger'))
-    .withFailureHandler(err=>showMsg(err.message,'danger'))[""+api]({customerId,drinkName,amount,operator});
+  }).withFailureHandler(err=>showMsg(err.message,'danger'))[""+api]({customerId,drinkName,amount,operator});
 }
-function genLink(){
+window.genLink = function(){
   const customerId=document.getElementById('dCustId').value.trim();
   google.script.run.withSuccessHandler(res=>{
     if(res.success){
+      document.getElementById('linkOutput').value=res.url;
       document.getElementById('qrImg').src=`https://chart.googleapis.com/chart?cht=qr&chs=180x180&chl=${encodeURIComponent(res.url)}`;
       document.getElementById('qrImg').style.display='block';
       showMsg('連結已產生');
     }else{ showMsg(res.msg,'danger'); }
   }).handleGenerateTempLink({customerId});
+}
+</script>
+<script>
+// === GAS API wrapper for static hosting ===
+const GAS_URL='https://script.google.com/macros/s/AKfycbzefiJNZ3ZugUrj-xlja58zaD7RQa9h1COOUEDcXwKzru3ogqoUHIs0Vqt0mXs15WOhMw/exec';
+async function api(action,data={}){
+  const res=await fetch(GAS_URL,{method:'POST',body:new URLSearchParams({action,data:JSON.stringify(data)})});
+  return res.json();
+}
+// override functions
+window.login = async function(){
+  const username=document.getElementById('username').value.trim();
+  const password=document.getElementById('password').value.trim();
+  const res=await api('login',{username,password});
+  if(res.success){
+    document.getElementById('authCard').classList.add('hide');
+    document.getElementById('mainPanel').classList.remove('hide');
+    showMsg('登入成功');
+  }else showMsg(res.msg,'danger');
+}
+window.register = async function(){
+  const username=document.getElementById('username').value.trim();
+  const password=document.getElementById('password').value.trim();
+  const verifyCode=document.getElementById('verifyCode').value.trim();
+  const res=await api('register',{username,password,verifyCode});
+  if(res.success){showMsg('註冊成功，請重新登入');toggleMode(new Event('click'));}
+  else showMsg(res.msg,'danger');
+}
+window.createCustomer = async function(){
+  const customerId=document.getElementById('newCustId').value.trim();
+  const customerName=document.getElementById('newCustName').value.trim();
+  const res=await api('createCustomer',{customerId,customerName});
+  showMsg(res.msg,res.success?'success':'danger');
+}
+window.loadCustomer = async function(){
+  const customerId=document.getElementById('dCustId').value.trim();
+  if(!customerId) return;
+  const res=await api('getCustomerData',{customerId});
+  if(!res.success){showMsg(res.msg,'danger');return;}
+  renderDrinkInfo(res.data);
+  document.getElementById('shareBtn').style.display='inline-block';
+}
+window.changeDrink = async function(sign){
+  const customerId=document.getElementById('dCustId').value.trim();
+  const drinkName=document.getElementById('drinkName').value.trim();
+  const amount=document.getElementById('drinkAmt').value;
+  const operator=document.getElementById('username').value;
+  const action= sign>0 ? 'addDrink' :'reduceDrink';
+  const res=await api(action,{customerId,drinkName,amount,operator});
+  showMsg(res.msg,res.success?'success':'danger');
+}
+window.genLink = async function(){
+  const customerId=document.getElementById('dCustId').value.trim();
+  const res=await api('generateTempLink',{customerId});
+  if(res.success){
+    document.getElementById('linkOutput').value=res.url;
+    document.getElementById('qrImg').src=`https://chart.googleapis.com/chart?cht=qr&chs=180x180&chl=${encodeURIComponent(res.url)}`;
+    document.getElementById('qrImg').style.display='block';
+    showMsg('連結已產生');
+  }else showMsg(res.msg,'danger');
 }
 </script>
 </body>
