@@ -238,7 +238,7 @@ window.genLink = function(){
 </script>
 <script>
 // === GAS API wrapper for static hosting ===
-const GAS_URL='https://script.google.com/macros/s/AKfycbzefiJNZ3ZugUrj-xlja58zaD7RQa9h1COOUEDcXwKzru3ogqoUHIs0Vqt0mXs15WOhMw/exec';
+const GAS_URL='https://script.google.com/macros/s/AKfycbzV6SBEMbmrfI4CYpmA5fPRhCSYGT8O8Om6QMt4h5OWJLGN0yv9bet3f6bVvF3WyFY92w/exec';
 async function api(action,data={}){
   const res=await fetch(GAS_URL,{method:'POST',body:new URLSearchParams({action,data:JSON.stringify(data)})});
   return res.json();
