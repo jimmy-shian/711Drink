@@ -181,7 +181,7 @@ function handleRegister(p) {
   const { username, password, verifyCode } = p;
   const ss = getSS();
   const cfg = ss.getSheetByName(SHEET_CONFIG).getRange("A1").getValue();
-  if (verifyCode !== cfg) {
+  if (String(verifyCode) !== String(cfg)) {
     return { success: false, msg: "驗證碼錯誤" };
   }
   const sheet = ss.getSheetByName(SHEET_ADMINS);

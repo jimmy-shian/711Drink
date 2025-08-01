@@ -284,7 +284,7 @@ window.showMsg = function(txt,type='success'){
 </script>
 <script>
 // === GAS API wrapper for static hosting ===
-const GAS_URL='https://script.google.com/macros/s/AKfycbwufMlRs9DzR_P_oAhQOAeC1ZxWSkYS6It2Ch2Sxy0UT1OZQruOiSUgQibykKJNGd8VLQ/exec';
+const GAS_URL='https://script.google.com/macros/s/AKfycbwb31VDNTfMAgvOhXnaETnnOaC5ZLdUf79Mc5bIaBRqf8If4IpQYl3QV8u2Bvh-dsL2Og/exec';
 function api(action,data={}){
   return $.post(GAS_URL,{action, data: JSON.stringify(data)})
           .then(res=>typeof res==='string'?JSON.parse(res):res);
@@ -341,6 +341,7 @@ window.createCustomer = async function(){
   try{
     const customerId=document.getElementById('newCustId').value.trim();
     const customerName=document.getElementById('newCustName').value.trim();
+    if(!customerId || !customerName){showMsg('請輸入完整資料','danger');return;}
     const res=await api('createCustomer',{customerId,customerName});
     showMsg(res.msg,res.success?'success':'danger');
   }catch(err){
@@ -377,6 +378,13 @@ const setLoading=flag=>{
   else{overlay.style.display='none';}
 };
 
+// 函數：控制背景顏色閃爍
+const flashBackgroundColor = (color, duration1 = 100, duration2 = 150) => {
+  document.body.style.backgroundColor = color;
+  setTimeout(() => document.body.style.backgroundColor = '', duration1);
+  setTimeout(() => document.body.style.backgroundColor = color, duration2);
+};
+
 window.loadCustomer = async function(){
   setLoading(true);
   try{
@@ -392,8 +400,10 @@ window.loadCustomer = async function(){
     const dl=document.getElementById('drinkSuggestions');
     dl.innerHTML=[...names].map(n=>`<option value="${n}"></option>`).join('');
     document.getElementById('shareBtn').style.display='inline-block';
+    flashBackgroundColor('#cfffdc',100,150);
   }catch(err){
     showMsg(err.message||'發生錯誤','danger');
+    flashBackgroundColor('#ffb6c1',100,150);
   }finally{
     setLoading(false);
   }
