@@ -9,6 +9,12 @@
   <style>
     body { padding-top: 40px; }
     .hide { display:none; }
+    /* Hover effects for all buttons */
+    .btn:hover, .btn:focus {
+      transform: translateY(-1px);
+      box-shadow: 0 .25rem .5rem rgba(0,0,0,.15);
+      transition: all .3s ease-in-out;
+    }
   </style>
 </head>
 <body>
@@ -260,21 +266,62 @@ document.getElementById('cupChk').addEventListener('change',syncNameByCup);
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 let isRegisterMode = false;
-window.toggleMode = function(e){
+window.toggleMode = function (e) {
   e.preventDefault();
   isRegisterMode = !isRegisterMode;
-  document.getElementById('vcodeGroup').classList.toggle('hide', !isRegisterMode);
-  document.getElementById('registerBtn').classList.toggle('hide', !isRegisterMode);
-  document.getElementById('loginBtn').classList.toggle('hide', isRegisterMode);
-  document.getElementById('authTitle').innerText = isRegisterMode ? '管理員註冊' : '管理員登入';
-  document.getElementById('toggleAuth').innerText = isRegisterMode ? '已有帳號？點此登入' : '尚未註冊？點此註冊';
-}
+  const fadeDur = 150, slideDur = 250;
+  if (isRegisterMode) {
+    // Step1: fade out current text & login button
+    $.when(
+      $('#loginBtn, #toggleAuth, #authTitle').animate({opacity:0}, fadeDur)
+    ).then(() => {
+      $('#loginBtn').addClass('hide');
+      // update texts
+      $('#authTitle').text('管理員註冊');
+      $('#toggleAuth').text('已有帳號？點此登入');
+      // Step2: slide down register fields (still transparent)
+      $('#vcodeGroup, #registerBtn')
+        .removeClass('hide')
+        .css({opacity:0, display:'none'})
+        .slideDown(slideDur)
+        .promise()
+        .then(()=>{
+          // Step3: fade in register fields & updated texts
+          $('#vcodeGroup, #registerBtn, #toggleAuth, #authTitle').animate({opacity:1}, fadeDur);
+        });
+    });
+  } else {
+    // Step1: fade out register fields & texts
+    $.when(
+      $('#vcodeGroup, #registerBtn, #toggleAuth, #authTitle').animate({opacity:0}, fadeDur)
+    ).then(()=>{
+      // Step2: slide up and hide register fields
+      $('#vcodeGroup, #registerBtn').slideUp(slideDur, function(){ $(this).addClass('hide'); });
+      // update texts
+      $('#authTitle').text('管理員登入');
+      $('#toggleAuth').text('尚未註冊？點此註冊');
+      // Step3: show login and fade in everything after slide
+      setTimeout(()=>{
+        $('#loginBtn').removeClass('hide').css('opacity',0);
+        $('#loginBtn, #toggleAuth, #authTitle').animate({opacity:1}, fadeDur);
+      }, slideDur);
+    });
+  }
+  $('#authTitle').text(isRegisterMode ? '管理員註冊' : '管理員登入');
+  $('#toggleAuth').text(isRegisterMode ? '已有帳號？點此登入' : '尚未註冊？點此註冊');
+};
 window.showMsg = function(txt,type='success'){
-  const el=document.getElementById('msg');
-  el.className='alert alert-'+type;
-  el.innerText=txt;
-  el.classList.remove('hide');
-  setTimeout(()=>el.classList.add('hide'),3000);
+  const $el = $('#msg');
+  $el.stop(true,true); // 清除未完成動畫
+  $el.removeClass('hide')
+     .attr('class', 'alert alert-'+type) // 同時更新 class
+     .text(txt)
+     .css('opacity',0)
+     .animate({opacity:1},400)          // 淡入 400ms
+     .delay(2500)                       // 停留 2.5 秒
+     .animate({opacity:0},400,()=>{     // 淡出 400ms
+       $el.addClass('hide');
+     });
 }
 
 
@@ -295,6 +342,7 @@ window.login = async function(){
   try{
     const username=document.getElementById('username').value.trim();
     const password=document.getElementById('password').value.trim();
+    if(!username||!password){showMsg('需輸入完整資料','danger');return;}
     const res=await api('login',{username,password});
     if(res.success){
        document.getElementById('authCard').classList.add('hide');
@@ -318,6 +366,7 @@ window.register = async function(){
     const username=document.getElementById('username').value.trim();
     const password=document.getElementById('password').value.trim();
     const verifyCode=document.getElementById('verifyCode').value.trim();
+    if (!username || !password || !verifyCode){showMsg('請輸入完整資料','danger');return;}
     const res=await api('register',{username,password,verifyCode});
     if(res.success){showMsg('註冊成功，請重新登入');toggleMode(new Event('click'));}
     else showMsg(res.msg,'danger');
@@ -404,7 +453,18 @@ window.loadCustomer = async function(){
     const customerId=document.getElementById('dCustId').value.trim();
     if(!customerId){ return; }
     const res=await api('getCustomerSummary',{customerId,offset:0,limit:5});
-    if(!res.success){ flashBackgroundColor('#ffb6c1', 3, 500); showMsg(res.msg,'danger'); return; }
+    if(!res.success){
+      flashBackgroundColor('#fad9ee', 2, 500);
+      showMsg(res.msg,'danger');
+      // 移除先前載入的顧客資料，使錯誤狀態更明確
+      document.getElementById('drinkInfo').innerHTML = '';
+      document.getElementById('historyList').innerHTML = '';
+      document.getElementById('moreBtn').style.display = 'none';
+      document.getElementById('shareBtn').style.display = 'none';
+      const dlClear = document.getElementById('drinkSuggestions');
+      if(dlClear) dlClear.innerHTML='';
+      return;
+    }
     renderDrinkInfo(customerId);
     // suggestions build from remain + history
     const names=new Set();
@@ -413,7 +473,7 @@ window.loadCustomer = async function(){
     const dl=document.getElementById('drinkSuggestions');
     dl.innerHTML=[...names].map(n=>`<option value="${n}"></option>`).join('');
     document.getElementById('shareBtn').style.display='inline-block';
-    flashBackgroundColor('#cfffdc', 3, 500);
+
   }catch(err){
     showMsg(err.message||'發生錯誤','danger');
   }finally{
@@ -456,7 +516,9 @@ window.genLink = async function(){
     const res=await api('generateTempLink',{customerId});
     if(res.success){
       const token = res.token || (res.url ? new URL(res.url).searchParams.get('token') : '');
-      const basePath = location.pathname.endsWith('index.html') ? location.pathname.replace('index.html','userView.html') : '/userView.html';
+      const basePath = location.pathname.endsWith('index.html') 
+        ? location.pathname.replace('index.html', 'userView.html') 
+        : location.pathname.replace(/\/$/, '') + '/userView.html';
       const url = location.origin + basePath + `?token=${token}`;
       document.getElementById('linkOutput').value=url;
       document.getElementById('qrImg').src=`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`;
@@ -498,6 +560,25 @@ if (linkGroupEl) {
  document.getElementById('editAdminModal').addEventListener('show.bs.modal',()=>{
    document.getElementById('editDisplayName').value=currentDisplayName;
  });
+
+ // === Enter key submission helpers ===
+ const bindEnter = (selector, handler) => {
+   document.querySelectorAll(selector).forEach(el => {
+     el.addEventListener('keydown', e => {
+       if (e.key === 'Enter') {
+         e.preventDefault();
+         handler();
+       }
+     });
+   });
+ };
+ // Login / Register
+ bindEnter('#username, #password', () => { if (!isRegisterMode) login(); });
+ bindEnter('#verifyCode', () => { if (isRegisterMode) register(); });
+ // Customer search
+ bindEnter('#dCustId', loadCustomer);
+ // Create customer
+ bindEnter('#newCustId, #newCustName', createCustomer);
 // 更新自己
 window.updateMe = async function(){
   const newName=document.getElementById('editDisplayName').value.trim();
