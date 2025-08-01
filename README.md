@@ -91,8 +91,10 @@
 - 回傳: `{ success:boolean, msg:string }`
 
 ### 3. `Customers`
-| CustomerID | CustomerName | SheetName |
-|------------|---------------|-----------|
+| CustomerID | CustomerName |
+|------------|--------------|
+
+> 內部會額外儲存 `SheetName` 欄位以對應各顧客工作表，但前端及 API 不會傳回此欄位，以保護內部結構。
 
 ### 4. 各顧客專屬 Sheet（自動建立）
 | 飲料名稱 | 剩餘杯數 | 操作時間 | 操作者 | 動作 | 異動數量 |

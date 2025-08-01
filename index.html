@@ -7,6 +7,8 @@
   <!-- Bootstrap 5 CDN -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
+  :root{ --base-bg:#f2f5f3; }
+  body{ background-color:var(--base-bg); }
     body { padding-top: 40px; }
     .hide { display:none; }
     /* Hover effects for all buttons */
@@ -15,6 +17,9 @@
       box-shadow: 0 .25rem .5rem rgba(0,0,0,.15);
       transition: all .3s ease-in-out;
     }
+    /* Skeleton loading */
+    .skeleton{background-color:#6c757d33;border-radius:4px;animation:pulse 1.5s infinite;}
+    @keyframes pulse{0%{opacity:1;}50%{opacity:.4;}100%{opacity:1;}}
   </style>
 </head>
 <body>
@@ -85,6 +90,17 @@
           </div>
         </div>
       </div>
+      <hr class="my-3">
+      <!-- 顧客搜尋 -->
+      <div class="row g-3 align-items-end d-none" id="custSearch">
+        <div class="col-md-4">
+          <input type="text" class="form-control" id="custFilter" placeholder="搜尋顧客 (可留空顯示全部)">
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-secondary w-100" onclick="searchCustomers()">搜尋</button>
+        </div>
+      </div>
+      <div class="mt-3 d-none" id="custList"></div>
       <!-- 飲料異動 -->
       <div class="tab-pane fade show active" id="drink" role="tabpanel">
         <div class="row g-3 align-items-end mb-3">
@@ -100,9 +116,15 @@
           </div>
         </div>
         <div id="drinkInfo" class="mb-4"></div>
-        <hr><h6>歷史異動</h6>
-        <div id="historyList"></div>
-        <div class="text-center my-2"><button id="moreBtn" class="btn btn-outline-secondary btn-sm" style="display:none">查看更多</button></div>
+        <div class="card mb-4">
+          <div class="card-header">
+            <h6 class="mb-0" id="historyHeader" style="cursor:pointer">歷史異動</h6>
+          </div>
+          <div class="card-body p-2">
+            <div id="historyList"></div>
+            <div class="text-center my-2"><button id="moreBtn" class="btn btn-outline-secondary btn-sm" style="display:none">查看更多</button></div>
+          </div>
+        </div>
         <div class="p-3 border rounded bg-light mb-3">
           <h6 class="mb-3">新增品項</h6>
           <div class="row g-3 align-items-end">
@@ -176,6 +198,34 @@
 <script>
 
 let historyOffset=0,historyHasMore=false, currentCustomer='';
+let historyCollapsed=false;
+function updateHistoryCollapse(){
+  const items=document.querySelectorAll('#historyList .hist-item');
+  items.forEach((el,idx)=>{
+    if(idx<5) return; // 前 5 筆永遠顯示
+    if(historyCollapsed){
+      // 要收合：只有顯示中的才 slideUp
+      if(!el.classList.contains('d-none')){
+        $(el).slideUp(200,()=>el.classList.add('d-none'));
+      }
+    }else{
+      // 要展開：先移除 d-none 再 slideDown
+      if(el.classList.contains('d-none')){
+        el.classList.remove('d-none');
+        $(el).hide().slideDown(200);
+      }
+    }
+  });
+  document.getElementById('moreBtn').style.display = historyCollapsed? 'inline-block': (historyHasMore?'inline-block':'none');
+}
+function toggleHistoryCollapse(){
+  historyCollapsed = !historyCollapsed;
+  updateHistoryCollapse();
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  const hdr=document.getElementById('historyHeader');
+  if(hdr) hdr.addEventListener('click',toggleHistoryCollapse);
+});
 
 function renderRemain(remainArr){
   const div=document.getElementById('drinkInfo');
@@ -188,14 +238,24 @@ function renderRemain(remainArr){
   div.innerHTML=html;
 }
 
+function formatDateTime(isoStr){
+  const d = new Date(isoStr);
+  if(isNaN(d)) return isoStr;
+  const weekday = ['日','一','二','三','四','五','六'][d.getDay()];
+  const dateStr = d.toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g,'/');
+  const timeStr = d.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
+  return `${dateStr} (${weekday}) ${timeStr}`;
+}
+
 function appendHistory(list){
   const hist=document.getElementById('historyList');
   list.forEach(row=>{
     const [name,remain,time,op,act,amt]=row;
+    const fmtTime = formatDateTime(time);
     const cls=act==='增加'?'border-start border-4 border-success':'border-start border-4 border-danger';
     const card=document.createElement('div');
-    card.className=`card mb-2 ${cls}`;
-    card.innerHTML=`<div class="card-body p-2"><div class="d-flex justify-content-between"><span>${time}</span><span>${op}</span></div><div>${act} ${name} ${amt} 杯，剩餘 ${remain}</div></div>`;
+    card.className=`card mb-2 hist-item ${cls}`;
+    card.innerHTML=`<div class="card-body p-2"><div class="d-flex justify-content-between"><span>${fmtTime}</span><span>${op}</span></div><div>${act} ${name} ${amt} 杯，剩餘 ${remain}</div></div>`;
     hist.appendChild(card);
   });
 }
@@ -208,11 +268,13 @@ async function fetchAndRenderSummary(offset,append){
     document.getElementById('historyList').innerHTML='';
   }
   appendHistory(res.history);
+  updateHistoryCollapse();
   historyHasMore=res.hasMore;
   document.getElementById('moreBtn').style.display= historyHasMore?'inline-block':'none';
 }
 
 document.getElementById('moreBtn').addEventListener('click',async()=>{
+  if(historyCollapsed){ historyCollapsed=false; updateHistoryCollapse(); return;}
   setLoading(true);
   try{
     historyOffset+=5;
@@ -230,6 +292,31 @@ window.renderDrinkInfo = async function(customerId){
   await fetchAndRenderSummary(0,false);
 }
 
+
+/* 查詢顧客列表 */
+window.searchCustomers = async function(){
+  const listEl = document.getElementById('custList');
+  setLoading(true);
+  listEl.classList.remove('d-none');
+  listEl.innerHTML = Array(6).fill('<div class="skeleton mb-2" style="height:20px;width:100%;"></div>').join('');
+  try{
+    const keyword = document.getElementById('custFilter').value.trim();
+    const res = await api('listCustomers',{keyword});
+    if(res.success){
+      // listEl 已事先定義
+      const arr = res.customers || [];
+      if(arr.length===0){
+        listEl.innerHTML = '<p class="text-muted">無符合顧客</p>';
+      }else{
+        let html = '<table class="table table-sm table-striped"><thead><tr><th>代號</th><th>姓名</th></tr></thead><tbody>';
+        arr.forEach(([id,name])=>{ html += `<tr><td>${id}</td><td>${name}</td></tr>`; });
+        html += '</tbody></table>';
+        listEl.innerHTML = html;
+      }
+    }else showMsg(res.msg,'danger');
+  }catch(e){ showMsg(e.message||'發生錯誤','danger'); }
+  finally{ setLoading(false); }
+};
 
 window.buildSuggestions = function(data){
   const dl=document.getElementById('drinkSuggestions');
@@ -266,6 +353,22 @@ document.getElementById('cupChk').addEventListener('change',syncNameByCup);
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 let isRegisterMode = false;
+// === 自動填入已儲存帳密 ===
+document.addEventListener('DOMContentLoaded', () => {
+  const saved = localStorage.getItem('adminCred');
+  if(saved){
+    try{
+      const WEEK_MS = 10*24*60*60*1000;
+      const {username,password,ts} = JSON.parse(saved);
+      if(!ts || Date.now()-ts > WEEK_MS){
+        localStorage.removeItem('adminCred');
+      }else{
+        if(username) document.getElementById('username').value = username;
+        if(password) document.getElementById('password').value = password;
+      }
+    }catch(e){ localStorage.removeItem('adminCred'); }
+  }
+});
 window.toggleMode = function (e) {
   e.preventDefault();
   isRegisterMode = !isRegisterMode;
@@ -331,7 +434,7 @@ window.showMsg = function(txt,type='success'){
 </script>
 <script>
 // === GAS API wrapper for static hosting ===
-const GAS_URL='https://script.google.com/macros/s/AKfycbwb31VDNTfMAgvOhXnaETnnOaC5ZLdUf79Mc5bIaBRqf8If4IpQYl3QV8u2Bvh-dsL2Og/exec';
+const GAS_URL='https://script.google.com/macros/s/AKfycbzaTzDAsiMlVZ4vigTUq4Yxvrog9bFXYxuuW_WtqDGsiPK2GrrmsCKdhEJTZD52sjfw/exec';
 function api(action,data={}){
   return $.post(GAS_URL,{action, data: JSON.stringify(data)})
           .then(res=>typeof res==='string'?JSON.parse(res):res);
@@ -352,6 +455,7 @@ window.login = async function(){
        document.getElementById('userLabel').innerText=`Hi~歡迎 ${currentDisplayName}`;
        document.getElementById('userBar').classList.remove('hide');
        document.getElementById('logoutBtn').classList.remove('d-none');
+       localStorage.setItem('adminCred', JSON.stringify({username,password,ts:Date.now()}));
        showMsg('登入成功');
      }else showMsg(res.msg,'danger');
   }catch(err){
@@ -368,7 +472,12 @@ window.register = async function(){
     const verifyCode=document.getElementById('verifyCode').value.trim();
     if (!username || !password || !verifyCode){showMsg('請輸入完整資料','danger');return;}
     const res=await api('register',{username,password,verifyCode});
-    if(res.success){showMsg('註冊成功，請重新登入');toggleMode(new Event('click'));}
+    if(res.success){
+      // 先結束本次 loading，再自動登入
+      setLoading(false);
+      await login();
+      return;
+    }
     else showMsg(res.msg,'danger');
   }catch(err){
     showMsg(err.message||'發生錯誤','danger');
@@ -410,11 +519,22 @@ window.createDrink = async function(){
     drinkName += '(隨行杯)';
   }
   const amount=parseInt(document.getElementById('drinkAmt').value,10)||1;
-  const operator=document.getElementById('username').value;
+  const operator=currentDisplayName;
   if(!customerId||!drinkName){showMsg('請輸入顧客與飲料','danger'); return;}
-    const res=await api('addDrink',{customerId,drinkName,amount,operator});
+    // 同時送出新增與拉最新摘要
+    const [res, summary] = await Promise.all([
+      api('addDrink',{customerId,drinkName,amount,operator}),
+      api('getCustomerSummary',{customerId,offset:0,limit:5})
+    ]);
     showMsg(res.msg,res.success?'success':'danger');
-    await loadCustomer();
+    if(summary && summary.success){
+      renderRemain(summary.remain);
+      document.getElementById('historyList').innerHTML = '';
+      appendHistory(summary.history);
+      updateHistoryCollapse();
+      historyHasMore = summary.hasMore;
+      document.getElementById('moreBtn').style.display = historyHasMore?'inline-block':'none';
+    }
   }catch(err){
     showMsg(err.message||'發生錯誤','danger');
   }finally{
@@ -442,13 +562,17 @@ const flashBackgroundColor = (color, times = 3, interval = 1000) => {
     // 當閃爍次數達到指定次數，清除定時器
     if (counter >= times * 2) {
       clearInterval(flashInterval);
-      document.body.style.backgroundColor = '';  // 最後清除顏色
+      document.body.style.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--base-bg').trim() || '#f2f5f3';  // 回復淡灰底色
     }
   }, interval);
 };
 
 window.loadCustomer = async function(){
   setLoading(true);
+  // skeleton placeholders
+  document.getElementById('drinkInfo').innerHTML = `<div class="row g-3">${Array(4).fill(0).map(()=>`<div class=\"col-md-3\"><div class=\"card\"><div class=\"card-body text-center\"><div class=\"skeleton rounded-circle mx-auto mb-2\" style=\"width:40px;height:40px;\"></div><div class=\"skeleton mx-auto mb-1\" style=\"height:20px;width:60%;\"></div><div class=\"skeleton mx-auto\" style=\"height:20px;width:80%;\"></div></div></div></div>`).join('')}</div>`;
+  document.getElementById('historyList').innerHTML = Array(5).fill('<div class="skeleton mb-2" style="height:24px;width:100%;"></div>').join('');
+  document.getElementById('moreBtn').style.display='none';
   try{
     const customerId=document.getElementById('dCustId').value.trim();
     if(!customerId){ return; }
@@ -498,11 +622,24 @@ window.changeDrink = async function(sign,drink){
     }
   if(!drinkName){showMsg('請輸入或選擇飲料名稱','danger');return;}
   const amount=1;
-  const operator=document.getElementById('username').value;
+  const operator=currentDisplayName;
   const action= sign>0 ? 'addDrink' :'reduceDrink';
-    const res=await api(action,{customerId,drinkName,amount,operator});
+    // 同步向後端送出異動並同時拉最新摘要，縮短等待時間
+    const [res, summary] = await Promise.all([
+      api(action,{customerId,drinkName,amount,operator}),
+      api('getCustomerSummary',{customerId,offset:0,limit:5})
+    ]);
     showMsg(res.msg,res.success?'success':'danger');
-    await loadCustomer();
+    if(summary && summary.success){
+      // 直接更新畫面，省去再次呼叫 loadCustomer
+      renderRemain(summary.remain);
+      // 清空並附加最新歷史
+      document.getElementById('historyList').innerHTML = '';
+      appendHistory(summary.history);
+      updateHistoryCollapse();
+      historyHasMore = summary.hasMore;
+      document.getElementById('moreBtn').style.display = historyHasMore?'inline-block':'none';
+    }
   }catch(err){
     showMsg(err.message||'發生錯誤','danger');
   }finally{
@@ -579,6 +716,13 @@ if (linkGroupEl) {
  bindEnter('#dCustId', loadCustomer);
  // Create customer
  bindEnter('#newCustId, #newCustName', createCustomer);
+// Customer list search
+bindEnter('#custFilter', searchCustomers);
+// toggle customer search visibility with tab switch
+$('#tabMenu button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+  const show = e.target.getAttribute('data-bs-target') === '#cust';
+  $('#custSearch, #custList').toggleClass('d-none', !show);
+});
 // 更新自己
 window.updateMe = async function(){
   const newName=document.getElementById('editDisplayName').value.trim();

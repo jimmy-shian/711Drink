@@ -70,20 +70,7 @@ function doGet(e) {
   if (e.parameter['type'] === 'OPTIONS') {
     return jsonOutput({ success: true, msg: 'OPTIONS request' });
   }
-  // 現有的 GET 邏輯
-  const page = (e.parameter.page || "index").toString();
-  if (page === "user") {
-    const token = e.parameter.token || "";
-    const payload = validateTempToken(token);
-    if (!payload) {
-      return HtmlService.createHtmlOutput("連結已失效或無效。");
-    }
-    const tpl = HtmlService.createTemplateFromFile("userView");
-    tpl.customerId = payload.customerId;
-    return tpl.evaluate().setTitle("顧客查詢");
-  }
-  // 預設回傳管理員介面
-  return HtmlService.createTemplateFromFile("index").evaluate().setTitle("711 飲料紀杯平台");
+  return HtmlService.createHtmlOutput("不要亂看");
 }
 
 
@@ -124,6 +111,9 @@ function doPost(e) {
       case 'reduceDrink':
         res = handleDrinkChange(data, -1);
         break;
+      case 'listCustomers':
+        res = handleListCustomers(data);
+        break;
       case 'getCustomerData':
         res = handleGetCustomerData(data);
         break;
@@ -163,12 +153,22 @@ function reduceDrinkAPI(p){
   return handleDrinkChange(p,-1);
 }
 
+function getAdminList(){
+  const cache=CacheService.getScriptCache();
+  const cached=cache.get('admin_list');
+  if(cached){
+    try{ return JSON.parse(cached);}catch(e){}
+  }
+  const sheet=getSS().getSheetByName(SHEET_ADMINS);
+  const rows=sheet.getDataRange().getValues().slice(1); // exclude header
+  cache.put('admin_list', JSON.stringify(rows), 86400); // cache 1 day
+  return rows;
+}
+
 function handleLogin(p){
   const { username, password } = p;
-  const ss = getSS();
-  const sheet = ss.getSheetByName(SHEET_ADMINS);
-  const data = sheet.getDataRange().getValues();
-  for(let i=1;i<data.length;i++){
+    const data = getAdminList();
+  for(let i=0;i<data.length;i++){
     const row=data[i];
     if(String(row[ADMIN_COL_USERNAME-1])===String(username) && String(row[ADMIN_COL_PASSWORD-1])===String(password)){
       return {success:true, username: row[ADMIN_COL_USERNAME-1], displayName: row[ADMIN_COL_NAME-1] || username };
@@ -186,10 +186,37 @@ function handleRegister(p) {
   }
   const sheet = ss.getSheetByName(SHEET_ADMINS);
   sheet.appendRow([String(username), String(password), username]);
+  // clear admin cache for immediate effect
+  CacheService.getScriptCache().remove('admin_list');
   return { success: true, msg: "註冊成功，可重新登入" };
 }
 
 /*************** 顧客與飲料管理 ***************/
+
+
+/************* 顧客列表查詢 ***************/
+/**
+ * listCustomers: 取得所有顧客或依關鍵字過濾
+ * @param {{keyword?:string}}
+ * @return {{success:boolean, customers:Array<[string,string]>}}
+ */
+function handleListCustomers(p){
+  const { keyword="" } = p || {};
+  const ss = getSS();
+  const sheet = ss.getSheetByName(SHEET_CUSTOMERS);
+  const rows = sheet.getDataRange().getValues();
+  const out = [];
+  const kw = keyword.toString().trim().toLowerCase();
+  for(let i=1;i<rows.length;i++){
+    const id = String(rows[i][0]);
+    const name = String(rows[i][1]);
+    if(!kw || id.toLowerCase().includes(kw) || name.toLowerCase().includes(kw)){
+      out.push([id,name]);
+    }
+  }
+  return { success:true, customers: out };
+}
+
 function handleCreateCustomer(p) {
   const { customerId, customerName } = p;
   const ss = getSS();
@@ -237,6 +264,7 @@ function handleUpdateAdmin(p){
       }
       if(newPassword){ sheet.getRange(i+1,ADMIN_COL_PASSWORD).setValue(String(newPassword)); }
       if(newName){ sheet.getRange(i+1,ADMIN_COL_NAME).setValue(String(newName)); }
+      CacheService.getScriptCache().remove('admin_list');
       return {success:true,msg:'更新成功'};
     }
   }
@@ -365,7 +393,7 @@ function handleGetCustomerSummary(p){
   const lim=parseInt(limit,10)||5;
   const data=getCustomerSheetData(customerId);
   if(data.length<=1){
-    return {success:true, remain:[], history:[], hasMore:false};
+    return {success:true, remain:[], history:[], hasMore:false, customerName:customerId};
   }
   // 最新餘量 map
   const remainMap={};
@@ -378,7 +406,7 @@ function handleGetCustomerSummary(p){
   const rows=data.slice(1).reverse();
   const historyPage=rows.slice(off, off+lim);
   const hasMore=off+lim<rows.length;
-  return {success:true, remain:remainArr, history:historyPage, hasMore};
+  return {success:true, remain:remainArr, history:historyPage, hasMore, customerName:customerId};
 }
 
 /**

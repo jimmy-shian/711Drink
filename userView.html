@@ -12,11 +12,11 @@
 </head>
 <body>
 <div class="container py-4">
-  <h3 class="mb-4">寄杯紀錄</h3>
+  <h3 class="mb-4" id="titleHeader">寄杯紀錄</h3>
   <div id="info" class="mb-3"></div>
   <div id="drinkList" class="row g-3"></div>
   <hr>
-  <h5>歷史異動</h5>
+  <h5 id="histHeader" style="cursor:pointer">歷史異動</h5>
   <div id="history"></div>
   <div class="accordion mt-3" id="monthAcc"></div>
 </div>
@@ -31,7 +31,7 @@
 // === Static view ===
 const urlParams = new URLSearchParams(location.search);
 const token = urlParams.get('token');
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbwb31VDNTfMAgvOhXnaETnnOaC5ZLdUf79Mc5bIaBRqf8If4IpQYl3QV8u2Bvh-dsL2Og/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzaTzDAsiMlVZ4vigTUq4Yxvrog9bFXYxuuW_WtqDGsiPK2GrrmsCKdhEJTZD52sjfw/exec';
 
 // API helper function using jQuery
 function api(action, data = {}) {
@@ -66,6 +66,38 @@ const setLoading = flag => {
   else{overlay.style.display='none';}
 };
 
+// ----- time formatter -----
+function formatDateTime(isoStr){
+  const d=new Date(isoStr);
+  if(isNaN(d)) return isoStr;
+  const weekday=['日','一','二','三','四','五','六'][d.getDay()];
+  const dateStr=d.toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g,'/');
+  const timeStr=d.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
+  return `${dateStr} (${weekday}) ${timeStr}`;
+}
+// ----- history collapse helpers -----
+let historyCollapsed = true;
+let historyHasMore = false;
+function ensureMoreBtnAtEnd(){
+  const btn=document.getElementById('moreBtn');
+  if(btn) document.getElementById('history').appendChild(btn);
+}
+
+function updateHistoryCollapse(){
+  const items=document.querySelectorAll('#history .hist-item');
+  items.forEach((el,idx)=>{
+    if(idx<5) return;
+    if(historyCollapsed){
+      if(!el.classList.contains('d-none')) $(el).slideUp(200,()=>el.classList.add('d-none'));
+    }else{
+      if(el.classList.contains('d-none')){ el.classList.remove('d-none'); $(el).hide().slideDown(200);} 
+    }
+  });
+  const moreBtn=document.getElementById('moreBtn');
+  if(moreBtn){ moreBtn.style.display = historyCollapsed? 'inline-block': (historyHasMore?'inline-block':'none'); }
+  ensureMoreBtnAtEnd();
+}
+$(document).on('click','#histHeader',()=>{ historyCollapsed=!historyCollapsed; updateHistoryCollapse(); });
 // Render function
 async function render() {
   setLoading(true);
@@ -98,7 +130,7 @@ async function render() {
   if(!res.success){ document.getElementById('info').innerText=res.msg;return; }
   const remainArr=res.remain;
   const historySlice=res.history;
-  const hasMore=res.hasMore;
+  historyHasMore=res.hasMore;
   if(remainArr.length===0){
     document.getElementById('info').innerText = '尚無資料';
     return;
@@ -108,6 +140,7 @@ async function render() {
   remainArr.forEach(([n,r])=>{drinkMap[n]=r;});
 
   // Render drink list
+  document.getElementById('titleHeader').innerText = `${res.customerName} 的寄杯紀錄`;
   const listEl = document.getElementById('drinkList');
   listEl.innerHTML = '';
   Object.entries(drinkMap).forEach(([name, remain]) => {
@@ -121,16 +154,18 @@ async function render() {
   const histEl = document.getElementById('history');
   histEl.innerHTML = '';
   historySlice.forEach(h=>{
+    const fmt = formatDateTime(h[2]);
     const cls = h[4] === '增加' ? 'card-add' : 'card-reduce';
     const card = document.createElement('div');
-    card.className = `card mb-2 ${cls}`;
-    card.innerHTML = `<div class="card-body p-2"><div class="d-flex justify-content-between"><span>${h[2]}</span><span>${h[3]}</span></div><div>${h[4]} ${h[0]} ${h[5]} 杯，剩餘 ${h[1]}</div></div>`;
+    card.className = `card mb-2 hist-item ${cls}`;
+    card.innerHTML = `<div class="card-body p-2"><div class="d-flex justify-content-between"><span>${fmt}</span><span>${h[3]}</span></div><div>${h[4]} ${h[0]} ${h[5]} 杯，剩餘 ${h[1]}</div></div>`;
     histEl.appendChild(card);
   });
   // 查看更多
-  if(hasMore){
+  if(historyHasMore){
     const btn=document.createElement('button');
     btn.className='btn btn-outline-secondary btn-sm my-2';
+    btn.id='moreBtn';
     btn.innerText='查看更多';
     let offset=5;
     btn.onclick=async()=>{
@@ -142,9 +177,11 @@ async function render() {
           r.history.forEach(h=>{
             const cls=h[4]==='增加'?'card-add':'card-reduce';
             const card=document.createElement('div');
-            card.className=`card mb-2 ${cls}`;
-            card.innerHTML=`<div class=\"card-body p-2\"><div class=\"d-flex justify-content-between\"><span>${h[2]}</span><span>${h[3]}</span></div><div>${h[4]} ${h[0]} ${h[5]} 杯，剩餘 ${h[1]}</div></div>`;
+            card.className=`card mb-2 hist-item ${cls}`;
+            const fmt2=formatDateTime(h[2]);
+            card.innerHTML=`<div class=\"card-body p-2\"><div class=\"d-flex justify-content-between\"><span>${fmt2}</span><span>${h[3]}</span></div><div>${h[4]} ${h[0]} ${h[5]} 杯，剩餘 ${h[1]}</div></div>`;
             document.getElementById('history').appendChild(card);
+            ensureMoreBtnAtEnd();
           });
           offset+=5;
           if(!r.hasMore) btn.remove();
@@ -156,6 +193,8 @@ async function render() {
       }
     };
     document.getElementById('history').appendChild(btn);
+    ensureMoreBtnAtEnd();
+    updateHistoryCollapse();
   }
 
   buildMonthAccordion(customerId);
