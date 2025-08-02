@@ -243,15 +243,100 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(hdr) hdr.addEventListener('click',toggleHistoryCollapse);
 });
 
-function renderRemain(remainArr){
-  const div=document.getElementById('drinkInfo');
-  if(remainArr.length===0){div.innerHTML='<p>尚無資料</p>';return;}
-  let html='<div class="row g-3">';
-  remainArr.forEach(([n,r])=>{
-    html+=`<div class="col-md-3"><div class="card"><div class="card-body text-center"><h5>${n}</h5><p class="fs-4 mb-2">${r}</p><div class="d-flex justify-content-center"><button class="btn btn-sm btn-danger me-2" onclick="changeDrink(-1,'${n}')">減少(-1)</button><button class="btn btn-sm btn-success" onclick="changeDrink(1,'${n}')">增加(+1)</button></div></div></div></div>`;
+// 定義飲料分類的關鍵字
+const DRINK_CATEGORIES = {
+  '拿鐵類': ['拿鐵', 'Latte', 'latte', '拿'],
+  '茶類': ['綠茶', '紅茶', '烏龍', '青茶', '四季春', '鐵觀音', '普洱', '花茶', '茶'],
+  '奶茶類': ['奶茶', '奶綠', '奶青', '奶烏', '奶蓋', '鮮奶茶', '奶'],
+  '咖啡類': ['咖啡', '美式', '濃縮', '卡布', '摩卡', '瑪奇朵'],
+  '抹茶類': ['抹茶', '焙茶', '抹'],
+  '水果茶類': ['水果', '百香', '檸檬', '柳橙', '葡萄', '莓果', '荔枝', '芒果', '鳳梨'],
+  '氣泡類': ['氣泡', '可樂', '雪碧', '沙士', '汽水'],
+  '其他': [] // 預設分類
+};
+
+// 根據飲料名稱判斷所屬分類
+function getDrinkCategory(drinkName) {
+  const name = drinkName.toLowerCase();
+  for (const [category, keywords] of Object.entries(DRINK_CATEGORIES)) {
+    if (keywords.some(keyword => name.includes(keyword.toLowerCase()))) {
+      return category;
+    }
+  }
+  return '其他';
+}
+
+function renderRemain(remainArr) {
+  const div = document.getElementById('drinkInfo');
+  if (remainArr.length === 0) {
+    div.innerHTML = '<p>尚無資料</p>';
+    return;
+  }
+  
+  // 1. 將飲料分類
+  const categorizedDrinks = {};
+  
+  // 初始化分類
+  Object.keys(DRINK_CATEGORIES).forEach(category => {
+    categorizedDrinks[category] = [];
   });
-  html+='</div>';
-  div.innerHTML=html;
+  
+  // 將飲料分配到對應的分類
+  remainArr.forEach(([name, amount]) => {
+    const category = getDrinkCategory(name);
+    if (!categorizedDrinks[category]) {
+      categorizedDrinks[category] = [];
+    }
+    categorizedDrinks[category].push({ name, amount });
+  });
+  
+  // 2. 生成 HTML
+  let html = '';
+  
+  // 遍歷所有分類
+  for (const [category, drinks] of Object.entries(categorizedDrinks)) {
+    // 跳過沒有飲料的分類
+    if (drinks.length === 0) continue;
+    
+    // 分類標題
+    html += `
+      <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center" 
+             style="cursor: pointer;" 
+             onclick="this.nextElementSibling.classList.toggle('d-none'); this.querySelector('i').classList.toggle('bi-chevron-up'); this.querySelector('i').classList.toggle('bi-chevron-down')">
+          <h5 class="mb-0">${category} <span class="badge bg-secondary">${drinks.length}種</span></h5>
+          <i class="bi bi-chevron-down"></i>
+        </div>
+        <div class="card-body p-0">
+          <div class="row g-3 p-3">
+    `;
+    
+    // 該分類下的所有飲料
+    drinks.forEach(({name, amount}) => {
+      html += `
+        <div class="col-md-3">
+          <div class="card h-100">
+            <div class="card-body text-center">
+              <h5 class="card-title">${name}</h5>
+              <p class="fs-4 mb-2">${amount}</p>
+              <div class="d-flex justify-content-center">
+                <button class="btn btn-sm btn-danger me-2" onclick="changeDrink(-1,'${name.replace(/'/g, "\\'")}')">減少(-1)</button>
+                <button class="btn btn-sm btn-success" onclick="changeDrink(1,'${name.replace(/'/g, "\\'")}')">增加(+1)</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+    
+    html += `
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  div.innerHTML = html;
 }
 
 function formatDateTime(isoStr){
@@ -287,6 +372,11 @@ async function fetchAndRenderSummary(offset,append){
   updateHistoryCollapse();
   historyHasMore=res.hasMore;
   document.getElementById('moreBtn').style.display= historyHasMore?'inline-block':'none';
+  
+  // 儲存當前選擇的顧客編號
+  if (currentCustomer) {
+    saveCurrentCustomer(currentCustomer);
+  }
 }
 
 document.getElementById('moreBtn').addEventListener('click',async()=>{
@@ -314,24 +404,101 @@ window.searchCustomers = async function(){
   const listEl = document.getElementById('custList');
   setLoading(true);
   listEl.classList.remove('d-none');
-  listEl.innerHTML = Array(6).fill('<div class="skeleton mb-2" style="height:20px;width:100%;"></div>').join('');
-  try{
+  listEl.innerHTML = Array(3).fill(`
+    <div class="skeleton mb-3 p-3 rounded">
+      <div class="d-flex justify-content-between align-items-center">
+        <div class="skeleton-text" style="width: 80px; height: 24px;"></div>
+        <div class="skeleton-text ms-3" style="width: 120px; height: 24px;"></div>
+      </div>
+    </div>
+  `).join('');
+  
+  try {
     const keyword = document.getElementById('custFilter').value.trim();
-    const res = await api('listCustomers',{keyword});
-    if(res.success){
-      // listEl 已事先定義
+    const res = await api('listCustomers', {keyword});
+    
+    if (res.success) {
       const arr = res.customers || [];
-      if(arr.length===0){
-        listEl.innerHTML = '<p class="text-muted">無符合顧客</p>';
-      }else{
-        let html = '<table class="table table-sm table-striped"><thead><tr><th>代號</th><th>姓名</th></tr></thead><tbody>';
-        arr.forEach(([id,name])=>{ html += `<tr><td>${id}</td><td>${name}</td></tr>`; });
-        html += '</tbody></table>';
+      
+      if (arr.length === 0) {
+        listEl.innerHTML = `
+          <div class="alert alert-light text-center text-muted">
+            <i class="bi bi-search me-2"></i>找不到符合的顧客
+          </div>`;
+      } else {
+        let html = `
+          <div class="table-responsive">
+            <table class="table table-hover align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th style="width: 35%;">
+                    <i class="bi bi-person-badge me-2"></i>顧客代號
+                  </th>
+                  <th style="width: 50%;">
+                    <i class="bi bi-person-lines-fill me-2"></i>顧客姓名
+                  </th>
+                  <th style="width: 15%;" class="text-center">操作</th>
+                </tr>
+              </thead>
+              <tbody>`;
+        
+        arr.forEach(([id, name]) => { 
+          html += `
+            <tr class="customer-row" style="cursor: pointer;" data-id="${id}">
+              <td>
+                <span class="badge bg-primary bg-opacity-10 text-primary">${id}</span>
+              </td>
+              <td>${name || '<span class="text-muted">未命名</span>'}</td>
+              <td class="text-center">
+                <button class="btn btn-sm btn-outline-primary select-customer" data-id="${id}">
+                  <i class="bi bi-arrow-right-circle"></i> 選擇
+                </button>
+              </td>
+            </tr>`;
+        });
+        
+        html += `
+              </tbody>
+            </table>
+          </div>`;
+        
         listEl.innerHTML = html;
+        
+        // 添加點擊事件
+        document.querySelectorAll('.customer-row').forEach(row => {
+          row.addEventListener('click', (e) => {
+            const id = row.getAttribute('data-id');
+            if (!e.target.closest('.select-customer')) {
+              document.getElementById('dCustId').value = id;
+              // 切換到飲料異動分頁
+              const drinkTab = new bootstrap.Tab(document.getElementById('drink-tab'));
+              drinkTab.show();
+              loadCustomer();
+            }
+          });
+        });
+        
+        // 添加選擇按鈕點擊事件
+        document.querySelectorAll('.select-customer').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = btn.getAttribute('data-id');
+            document.getElementById('dCustId').value = id;
+            // 切換到飲料異動分頁
+            const drinkTab = new bootstrap.Tab(document.getElementById('drink-tab'));
+            drinkTab.show();
+            loadCustomer();
+          });
+        });
       }
-    }else showMsg(res.msg,'danger');
-  }catch(e){ showMsg(e.message||'發生錯誤','danger'); }
-  finally{ setLoading(false); }
+    } else {
+      showMsg(res.msg, 'danger');
+    }
+  } catch (e) { 
+    showMsg(e.message || '發生錯誤', 'danger');
+  } finally { 
+    setLoading(false); 
+  }
 };
 
 window.buildSuggestions = function(data){
@@ -369,24 +536,47 @@ document.getElementById('cupChk').addEventListener('change',syncNameByCup);
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 let isRegisterMode = false;
+// 儲存當前選擇的顧客編號
+function saveCurrentCustomer(customerId) {
+  if (customerId) {
+    localStorage.setItem('lastCustomerId', customerId);
+  } else {
+    localStorage.removeItem('lastCustomerId');
+  }
+}
+
+// 載入上次選擇的顧客
+function loadLastCustomer() {
+  const lastCustomerId = localStorage.getItem('lastCustomerId');
+  if (lastCustomerId) {
+    document.getElementById('dCustId').value = lastCustomerId;
+    // 延遲執行確保 DOM 已完全載入
+    setTimeout(() => loadCustomer(), 100);
+  }
+}
+
 // === 自動填入已儲存帳密 ===
 document.addEventListener('DOMContentLoaded', () => {
   const savedSession = localStorage.getItem('sessionData');
-    if (savedSession) {
-        try {
-            const session = JSON.parse(savedSession);
-            const now = Date.now();
-            // 10 days expiry
-            if (session && session.username && session.displayName && (now - session.ts < 10 * 24 * 60 * 60 * 1000)) {
-                // 如果 session 有效，直接設定登入狀態，不需重新 api call
-                setLoggedInState(session.username, session.displayName);
-            } else {
-                localStorage.removeItem('sessionData');
-            }
-        } catch (e) {
-            localStorage.removeItem('sessionData');
-        }
+  if (savedSession) {
+    try {
+      const session = JSON.parse(savedSession);
+      const now = Date.now();
+      // 10 days expiry
+      if (session && session.username && session.displayName && (now - session.ts < 10 * 24 * 60 * 60 * 1000)) {
+        // 如果 session 有效，直接設定登入狀態，不需重新 api call
+        setLoggedInState(session.username, session.displayName);
+        // 載入上次選擇的顧客
+        loadLastCustomer();
+      } else {
+        localStorage.removeItem('sessionData');
+        localStorage.removeItem('lastCustomerId');
+      }
+    } catch (e) {
+      localStorage.removeItem('sessionData');
+      localStorage.removeItem('lastCustomerId');
     }
+  }
 });
 window.toggleMode = function (e) {
   e.preventDefault();
@@ -518,6 +708,13 @@ window.logout = function(){
   document.getElementById('userLabel').innerText='';
   document.getElementById('logoutBtn').classList.add('d-none');
   localStorage.removeItem('sessionData');
+  // 登出時清除顧客編號、歷史紀錄、歷史清單
+  saveCurrentCustomer('');
+  document.getElementById('historyList').innerHTML = '';
+  document.getElementById('moreBtn').style.display = 'none';
+  document.getElementById('shareBtn').style.display = 'none';
+  document.getElementById('drinkInfo').innerHTML = '';
+  document.getElementById('drinkSuggestions').innerHTML = '';
 };
 
 window.createCustomer = async function(){
@@ -599,7 +796,12 @@ window.loadCustomer = async function(){
   document.getElementById('moreBtn').style.display='none';
   try{
     const customerId=document.getElementById('dCustId').value.trim();
-    if(!customerId){ return; }
+    if(!customerId){ 
+      // 清空當前選擇的顧客
+      currentCustomer = null;
+      saveCurrentCustomer('');
+      return; 
+    }
     const res=await api('getCustomerSummary',{customerId,offset:0,limit:5});
     if(!res.success){
       flashBackgroundColor('#fad9ee', 2, 500);
