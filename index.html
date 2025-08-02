@@ -531,11 +531,9 @@ window.createDrink = async function(){
   const amount=parseInt(document.getElementById('drinkAmt').value,10)||1;
   const operator=currentDisplayName;
   if(!customerId||!drinkName){showMsg('請輸入顧客與飲料','danger'); return;}
-    // 同時送出新增與拉最新摘要
-    const [res, summary] = await Promise.all([
-      api('addDrink',{customerId,drinkName,amount,operator}),
-      api('getCustomerSummary',{customerId,offset:0,limit:5})
-    ]);
+    // 先新增飲料，再取得最新摘要
+    const res = await api('addDrink', {customerId, drinkName, amount, operator});
+    const summary = await api('getCustomerSummary', {customerId, offset: 0, limit: 5});
     showMsg(res.msg,res.success?'success':'danger');
     if(summary && summary.success){
       renderRemain(summary.remain);
