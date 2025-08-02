@@ -25,7 +25,7 @@
 <body>
 <div class="container">
   <!-- 提示訊息 -->
-  <div id="msg" class="alert hide" role="alert"></div>
+  <div id="msg" class="alert hide" role="alert" style="z-index: 2000;"></div>
   <!-- 使用者列 -->
   <div id="userBar" class="d-flex justify-content-end align-items-center mb-3 hide">
     <span id="userLabel" role="button" class="badge bg-info text-dark rounded-5 p-3" 
@@ -136,10 +136,10 @@
             </div>
             <div class="col-md-2">
               <label class="form-label">數量</label>
-              <input type="number" class="form-control" id="drinkAmt" value="1" min="1">
+              <input type="number" class="form-control" id="drinkAmt" value="1" step="1" inputmode="numeric" pattern="-?[0-9]*">
             </div>
             <div class="col-md-2">
-              <button class="btn btn-primary w-100 mt-4" onclick="createDrink()">新增品項</button>
+              <button type="button" class="btn btn-primary w-100 mt-4" id="drinkSubmitBtn" onclick="createDrink()">新增品項</button>
             </div>
           </div>
         </div>
@@ -218,6 +218,22 @@ function updateHistoryCollapse(){
   });
   document.getElementById('moreBtn').style.display = historyCollapsed? 'inline-block': (historyHasMore?'inline-block':'none');
 }
+
+// 監聽數量輸入變化，動態更新按鈕文字
+document.getElementById('drinkAmt').addEventListener('input', function() {
+  const amount = parseInt(this.value) || 0;
+  const btn = document.getElementById('drinkSubmitBtn');
+  if (amount < 0) {
+    btn.textContent = '減少品項';
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-warning');
+  } else {
+    btn.textContent = '新增品項';
+    btn.classList.remove('btn-warning');
+    btn.classList.add('btn-primary');
+  }
+});
+
 function toggleHistoryCollapse(){
   historyCollapsed = !historyCollapsed;
   updateHistoryCollapse();
@@ -437,7 +453,7 @@ window.showMsg = function(txt,type='success'){
 </script>
 <script>
 // === GAS API wrapper for static hosting ===
-const GAS_URL='https://script.google.com/macros/s/AKfycbxWjf8LY8HmrR8m0DdYNrMBS9MtBBCkfZa5ct_poztOtSbdsFn5yQT9hTyKqysENDx7ZQ/exec';
+const GAS_URL='https://script.google.com/macros/s/AKfycby5saXxJToZqGJXrTPAusoVwoUYoBw9rcWWmRdNGZHz7YwfeeUYGoUcBZmLwDUN7-ATUg/exec';
 function api(action,data={}){
   return $.post(GAS_URL,{action, data: JSON.stringify(data)})
           .then(res=>typeof res==='string'?JSON.parse(res):res);
@@ -735,6 +751,12 @@ $('#tabMenu button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
   const show = e.target.getAttribute('data-bs-target') === '#cust';
   $('#custSearch, #custList').toggleClass('d-none', !show);
 });
+// Create drink
+bindEnter('#drinkAmt', createDrink);
+
+// Update admin
+bindEnter('#editOldPwd', updateMe);
+
 // 更新自己
 window.updateMe = async function(){
   const newName=document.getElementById('editDisplayName').value.trim();

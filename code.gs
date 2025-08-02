@@ -277,6 +277,9 @@ function handleDrinkChange(p, deltaSign) {
   if(!customerId) return {success:false,msg:"找不到顧客"};
 
   const change = parseInt(amount, 10) * deltaSign;
+  const isReduction = change < 0; // 判斷是否為減少
+  const absChange = Math.abs(change);
+  
   const ss = getSS();
   const sheetCustomers = ss.getSheetByName(SHEET_CUSTOMERS);
   const list = sheetCustomers.getDataRange().getValues();
@@ -290,26 +293,61 @@ function handleDrinkChange(p, deltaSign) {
   if (!sheetName) return { success: false, msg: "找不到顧客" };
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) return { success: false, msg: "顧客工作表不存在" };
+  
   // 讀取現有飲料資料
   const rows = sheet.getDataRange().getValues();
   let rowIndex = -1;
+  let currentRemaining = 0;
+  
+  // 先找出該飲料是否已存在
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]) === String(drinkName)) {
       rowIndex = i + 1; // 轉成 GAS 的 1-base row index
+      currentRemaining = rows[i][1] || 0; // 取得當前剩餘數量
       break;
     }
   }
+  
+  // 計算新的剩餘數量
+  let newRemaining = (rowIndex === -1 ? 0 : currentRemaining) + change;
+  
+  // 確保不會變成負數
+  if (newRemaining < 0) {
+    return { success: false, msg: `錯誤：${drinkName} 的數量不足，無法減少` };
+  }
+  
+  // 決定操作類型文字
+  const actionType = isReduction ? "減少" : "增加";
+  
   if (rowIndex === -1) {
     // 新飲料
-    sheet.appendRow([drinkName, change, new Date(), operator, (deltaSign>0?"增加":"減少"), Math.abs(change)]);
+    sheet.appendRow([
+      drinkName, 
+      newRemaining, 
+      new Date(), 
+      operator, 
+      actionType, 
+      absChange
+    ]);
   } else {
     // 更新剩餘杯數
-    const remaining = sheet.getRange(rowIndex, 2).getValue() + change;
-    sheet.getRange(rowIndex, 2).setValue(remaining);
+    sheet.getRange(rowIndex, 2).setValue(newRemaining);
     // 新增異動紀錄（另外一行）
-    sheet.appendRow([drinkName, remaining, new Date(), operator, (deltaSign>0?"增加":"減少"), Math.abs(change)]);
+    sheet.appendRow([
+      drinkName, 
+      newRemaining, 
+      new Date(), 
+      operator, 
+      actionType, 
+      absChange
+    ]);
   }
-  return { success: true, msg: "異動完成" };
+  
+  return { 
+    success: true, 
+    msg: `${drinkName} 已${actionType} ${absChange} 杯`,
+    remaining: newRemaining
+  };
 }
 
 /*************** 臨時連結 ***************/
