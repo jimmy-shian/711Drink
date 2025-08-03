@@ -25,7 +25,7 @@
 <body>
 <div class="container">
   <!-- 提示訊息 -->
-  <div id="msg" class="alert hide" role="alert" style="z-index: 2000;"></div>
+  <div id="msg" class="alert hide" role="alert" style="z-index:2000; position:fixed; top:20px; left:50%; transform:translateX(-50%); max-width:90%;"></div>
   <!-- 使用者列 -->
   <div id="userBar" class="d-flex justify-content-end align-items-center mb-3 hide">
     <span id="userLabel" role="button" class="badge bg-info text-dark rounded-5 p-3" 
@@ -134,12 +134,31 @@
               <div class="form-check mt-1"><input class="form-check-input" type="checkbox" id="cupChk"><label class="form-check-label" for="cupChk">隨行杯</label></div>
               <datalist id="drinkSuggestions"></datalist>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-4">
               <label class="form-label">數量</label>
-              <input type="number" class="form-control" id="drinkAmt" value="1" step="1" inputmode="numeric" pattern="-?[0-9]*">
+              <input type="text" class="form-control w-75" id="drinkAmt" value="1" readonly>
+              <!-- 內嵌數字鍵盤 -->
+              <div id="keypadWrapper" class="border rounded p-3 mt-2" style="display:none;background-color:#eef5ff;">
+                <style>#keypadWrapper{width:fit-content;margin-right: 2rem;}#keypadWrapper .grid{display:grid;grid-template-columns:repeat(3,3rem);gap:6px;}#keypadWrapper .key-btn{border:1px solid #ccc;width:3rem;height:3rem;display:flex;align-items:center;justify-content:center;font-size:1.25rem;padding:0;}</style>
+                <div class="grid">
+                  <button type="button" class="btn btn-light key-btn" data-val="7">7</button>
+                  <button type="button" class="btn btn-light key-btn" data-val="8">8</button>
+                  <button type="button" class="btn btn-light key-btn" data-val="9">9</button>
+                  <button type="button" class="btn btn-light key-btn" data-val="4">4</button>
+                  <button type="button" class="btn btn-light key-btn" data-val="5">5</button>
+                  <button type="button" class="btn btn-light key-btn" data-val="6">6</button>
+                  <button type="button" class="btn btn-light key-btn" data-val="1">1</button>
+                  <button type="button" class="btn btn-light key-btn" data-val="2">2</button>
+                  <button type="button" class="btn btn-light key-btn" data-val="3">3</button>
+                  <button type="button" class="btn btn-light key-btn" data-val="-">-</button>
+                  <button type="button" class="btn btn-light key-btn" data-val="0">0</button>
+                  <button type="button" class="btn btn-light key-btn" data-val="del">⌫</button>
+                </div>
+
+              </div>
             </div>
-            <div class="col-md-2">
-              <button type="button" class="btn btn-primary w-100 mt-4" id="drinkSubmitBtn" onclick="createDrink()">新增品項</button>
+            <div class="col-md-3">
+              <button type="button" class="btn btn-primary w-75 mt-4" id="drinkSubmitBtn" onclick="createDrink()">新增品項</button>
             </div>
           </div>
         </div>
@@ -457,11 +476,11 @@ window.searchCustomers = async function(){
           html += `
             <tr class="customer-row" style="cursor: pointer;" data-id="${id}">
               <td>
-                <span class="badge bg-primary bg-opacity-10 text-primary">${id}</span>
+                <span class="badge rounded-pill" style="background-color:#e9ecef;color:#333;font-weight:600;">${id}</span>
               </td>
               <td>${name || '<span class="text-muted">未命名</span>'}</td>
               <td class="text-center">
-                <button class="btn btn-sm btn-outline-primary select-customer" data-id="${id}">
+                <button class="btn btn-sm btn-outline-dark select-customer" data-id="${id}">
                   <i class="bi bi-arrow-right-circle"></i> 選擇
                 </button>
               </td>
@@ -639,7 +658,7 @@ window.showMsg = function(txt,type='success'){
   $el.removeClass('hide')
      .attr('class', 'alert alert-'+type) // 同時更新 class
      .text(txt)
-     .css('opacity',0)
+     .css({opacity:0, position:'fixed', top:'20px', left:'50%', transform:'translateX(-50%)'})
      .animate({opacity:1},400)          // 淡入 400ms
      .delay(2500)                       // 停留 2.5 秒
      .animate({opacity:0},400,()=>{     // 淡出 400ms
@@ -808,9 +827,16 @@ window.loadCustomer = async function(){
   try{
     const customerId=document.getElementById('dCustId').value.trim();
     if(!customerId){ 
+      showMsg('請輸入顧客ID或名稱', 'danger');
       // 清空當前選擇的顧客
       currentCustomer = null;
       saveCurrentCustomer('');
+      document.getElementById('drinkInfo').innerHTML = ""
+      document.getElementById('historyList').innerHTML = ""
+      document.getElementById('shareBtn').style.display = 'none';
+      document.getElementById('moreBtn').style.display = 'none';
+      const dlClear = document.getElementById('drinkSuggestions');
+      if(dlClear) dlClear.innerHTML='';
       return; 
     }
     const res=await api('getCustomerSummary',{customerId,offset:0,limit:5});
@@ -841,6 +867,7 @@ window.loadCustomer = async function(){
     setLoading(false);
   }
 }
+
 window.changeDrink = async function(sign,drink){
   setLoading(true);
   try{
@@ -891,6 +918,9 @@ window.genLink = async function(){
   setLoading(true);
   try{
     const customerId=document.getElementById('dCustId').value.trim();
+    if (!customerId){
+      showMsg("請輸入顧客代號或名稱", 'danger')
+    }
     const res=await api('generateTempLink',{customerId});
     if(res.success){
       const token = res.token || (res.url ? new URL(res.url).searchParams.get('token') : '');
@@ -998,5 +1028,97 @@ window.updateMe = async function(){
   finally{setLoading(false);}
 };
 </script>
+  <!-- Custom Keypad -->
+  <div id="customKeypadOld" class="d-none position-fixed bottom-0 start-0 bg-white border-top border-2 shadow w-100" style="z-index:1080; max-width:420px; margin:0 auto; left:0; right:0;">
+    <style>
+      #customKeypad {padding:8px;}
+      #customKeypad .key-btn{font-size:1.5rem; padding:12px 0;}
+      #customKeypad .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:6px;}
+    </style>
+    <div class="grid">
+      <button type="button" class="btn btn-light key-btn" data-val="7">7</button>
+      <button type="button" class="btn btn-light key-btn" data-val="8">8</button>
+      <button type="button" class="btn btn-light key-btn" data-val="9">9</button>
+      <button type="button" class="btn btn-light key-btn" data-val="4">4</button>
+      <button type="button" class="btn btn-light key-btn" data-val="5">5</button>
+      <button type="button" class="btn btn-light key-btn" data-val="6">6</button>
+      <button type="button" class="btn btn-light key-btn" data-val="1">1</button>
+      <button type="button" class="btn btn-light key-btn" data-val="2">2</button>
+      <button type="button" class="btn btn-light key-btn" data-val="3">3</button>
+      <button type="button" class="btn btn-light key-btn" data-val="-">-</button>
+      <button type="button" class="btn btn-light key-btn" data-val="0">0</button>
+      <button type="button" class="btn btn-light key-btn" data-val="del">⌫</button>
+    </div>
+    <button type="button" class="btn btn-primary w-100 mt-2 key-btn" data-val="done">完成</button>
+  </div>
+
+  <script>
+  (function(){
+    const keypad=document.getElementById('customKeypad');
+    const amtInput=document.getElementById('drinkAmt');
+    if(!keypad||!amtInput) return;
+    function show(){
+      keypad.classList.remove('d-none');
+      // 增加底部 padding 以避免被遮擋
+      document.body.style.paddingBottom=keypad.offsetHeight+'px';
+      // 捲動畫面，確保輸入框可見
+      amtInput.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+    function hide(){
+      keypad.classList.add('d-none');
+      document.body.style.paddingBottom='';
+    }
+    amtInput.addEventListener('focus',show);
+    document.addEventListener('click',e=>{if(!keypad.contains(e.target)&&e.target!==amtInput){hide();}});
+    keypad.addEventListener('click',e=>{
+      const btn=e.target.closest('.key-btn');
+      if(!btn)return;
+      const val=btn.dataset.val;
+      if(val==='del'){
+        amtInput.value=amtInput.value.slice(0,-1);
+      }else if(val==='done'){
+        hide(); amtInput.blur(); return;
+      }else if(val==='-'){
+        amtInput.value=amtInput.value.startsWith('-')? amtInput.value.slice(1): '-' + amtInput.value;
+      }else{
+        if(amtInput.value==='0') amtInput.value=val;
+        else amtInput.value+=val;
+      }
+      amtInput.dispatchEvent(new Event('input'));
+    });
+  })();
+  </script>
+
 </body>
+<script>
+(function(){
+  const wrapper=document.getElementById('keypadWrapper');
+  const input=document.getElementById('drinkAmt');
+  if(!wrapper||!input) return;
+  let justShown=false;
+  const show=()=>{
+    $(wrapper).stop(true,true).slideDown(200,()=>{
+      wrapper.scrollIntoView({behavior:'smooth',block:'nearest'});;
+    });
+    justShown=true;
+    setTimeout(()=>justShown=false,250);
+  }
+  const hide=()=>{$(wrapper).stop(true,true).slideUp(200);}
+  input.addEventListener('focus',show);
+  document.addEventListener('click',e=>{
+    if(justShown) return;
+    if(!wrapper.contains(e.target)&&e.target!==input){hide();}
+  });
+  document.getElementById('drinkSubmitBtn').addEventListener('click',hide);
+  wrapper.addEventListener('click',e=>{
+    const btn=e.target.closest('.key-btn'); if(!btn) return;
+    const v=btn.dataset.val;
+    if(v==='del'){ input.value=input.value.slice(0,-1);} 
+
+    else if(v==='-'){ input.value=input.value.startsWith('-')? input.value.slice(1): '-'+input.value; }
+    else { input.value=(input.value==='0')? v : input.value+v; }
+    input.dispatchEvent(new Event('input'));
+  });
+})();
+</script>
 </html>
